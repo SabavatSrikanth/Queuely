@@ -1,0 +1,205 @@
+<%- include('../layouts/main', { title: 'Business Dashboard - ' + appName, body: ` <div class="row mb-4">
+  <div class="col-12">
+    <h2 class="fw-bold" id="biz-heading">Business Dashboard</h2>
+    <p class="text-muted">Manage your queues, appointments, and staff.</p>
+  </div>
+  </div>
+
+  <div id="no-business-card" class="card shadow-sm border-0 mb-4" style="display: none;">
+    <div class="card-body text-center py-5">
+      <i class="bi bi-building display-1 text-muted mb-3"></i>
+      <h4>You don't have a business yet</h4>
+      <p class="text-muted">Create your business profile to start managing queues and appointments.</p>
+      <button class="btn btn-primary" id="btn-show-create-form">Create Business</button>
+      <div id="create-biz-form" class="mt-4 mx-auto" style="display:none; max-width: 400px; text-align:left;">
+        <div class="mb-2">
+          <input type="text" id="biz-name-input" class="form-control" placeholder="Business name">
+        </div>
+        <div class="mb-2">
+          <select id="biz-category-input" class="form-select">
+            <option value="healthcare">Healthcare</option>
+            <option value="salon_beauty">Salon & Beauty</option>
+            <option value="banking">Banking</option>
+            <option value="government">Government</option>
+            <option value="education">Education</option>
+            <option value="retail">Retail</option>
+            <option value="legal">Legal</option>
+            <option value="fitness">Fitness</option>
+            <option value="food_beverage">Food & Beverage</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <button class="btn btn-success w-100" id="btn-create-biz">Create</button>
+        <div id="create-biz-error" class="text-danger mt-2" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="stats-row" class="row g-4 mb-4" style="display: none;">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body text-center">
+          <h6 class="text-muted">Currently Waiting (Live)</h6>
+          <h2 class="fw-bold text-primary" id="stat-waiting">--</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body text-center">
+          <h6 class="text-muted">Served (Last 30 Days)</h6>
+          <h2 class="fw-bold text-success" id="stat-served">--</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body text-center">
+          <h6 class="text-muted">No-Show Rate</h6>
+          <h2 class="fw-bold text-warning" id="stat-noshow">--</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 h-100">
+        <div class="card-body text-center">
+          <h6 class="text-muted">Appointments (Last 30 Days)</h6>
+          <h2 class="fw-bold text-info" id="stat-appts">--</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-3">
+      <div class="card bg-primary text-white border-0 shadow-sm h-100">
+        <div class="card-body text-center">
+          <i class="bi bi-people-fill display-4 mb-2"></i>
+          <h5>Queue Manager</h5>
+          <a href="/dashboard/queue-manager" class="btn btn-light btn-sm mt-2 fw-bold text-primary">Open</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-success text-white border-0 shadow-sm h-100">
+        <div class="card-body text-center">
+          <i class="bi bi-calendar-check-fill display-4 mb-2"></i>
+          <h5>Appointments</h5>
+          <a href="/dashboard/appointments" class="btn btn-light btn-sm mt-2 fw-bold text-success">Open</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-warning text-dark border-0 shadow-sm h-100">
+        <div class="card-body text-center">
+          <i class="bi bi-bar-chart-fill display-4 mb-2"></i>
+          <h5>Analytics</h5>
+          <a href="/dashboard/analytics" class="btn btn-light btn-sm mt-2 fw-bold text-warning">Open</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card bg-info text-white border-0 shadow-sm h-100">
+        <div class="card-body text-center">
+          <i class="bi bi-building-fill display-4 mb-2"></i>
+          <h5>Branches & Services</h5>
+          <a href="/dashboard/branches" class="btn btn-light btn-sm mt-2 fw-bold text-info">Open</a>
+        </div>
+      </div>
+    </div>
+  </div>
+  `, script: `
+  <script>
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    async function getLiveWaitingCount(bizId) {
+      try {
+        const svcRes = await fetch('/api/services?business=' + bizId);
+        const svc = await svcRes.json();
+        if (!svc.success) return 0;
+        let total = 0;
+        for (const s of svc.data) {
+          const liveRes = await fetch('/api/queue/' + s._id + '/live');
+          const live = await liveRes.json();
+          if (live.success) total += (live.data.waitingCount || 0);
+        }
+        return total;
+      } catch (e) {
+        return 0;
+      }
+    }
+
+    async function loadDashboard() {
+      const meRes = await fetch('/api/auth/me');
+      const me = await meRes.json();
+      if (!me.success) return;
+
+      if (!me.data.businessId) {
+        if (me.data.role !== 'super_admin') {
+          document.getElementById('no-business-card').style.display = 'block';
+        }
+        return;
+      }
+
+      const bizId = me.data.businessId;
+      const bizRes = await fetch('/api/businesses/' + bizId);
+      const biz = await bizRes.json();
+      if (biz.success) {
+        document.getElementById('biz-heading').innerText = biz.data.name;
+      }
+
+      if (me.data.role === 'business_owner' || me.data.role === 'super_admin') {
+        const analyticsRes = await fetch('/api/analytics/business/' + bizId);
+        const analytics = await analyticsRes.json();
+        if (analytics.success) {
+          document.getElementById('stats-row').style.display = 'flex';
+          document.getElementById('stat-waiting').innerText = await getLiveWaitingCount(bizId);
+          document.getElementById('stat-served').innerText = analytics.data.summary.totalServed;
+          document.getElementById('stat-noshow').innerText = analytics.data.summary.noShowRatePercent + '%';
+          document.getElementById('stat-appts').innerText = analytics.data.summary.appointmentsBooked;
+        }
+      }
+    }
+
+    async function createBusiness() {
+      const name = document.getElementById('biz-name-input').value.trim();
+      const category = document.getElementById('biz-category-input').value;
+      const errorBox = document.getElementById('create-biz-error');
+      errorBox.style.display = 'none';
+      if (!name) {
+        errorBox.textContent = 'Please enter a business name.';
+        errorBox.style.display = 'block';
+        return;
+      }
+      try {
+        const res = await fetch('/api/businesses', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: name, category: category, address: { city: 'Main City', country: 'India' } })
+        });
+        const data = await res.json();
+        if (data.success) {
+          window.location.reload();
+        } else {
+          errorBox.textContent = data.error || data.message || 'Could not create business.';
+          errorBox.style.display = 'block';
+        }
+      } catch (err) {
+        errorBox.textContent = 'Request failed. Please try again.';
+        errorBox.style.display = 'block';
+      }
+    }
+
+    document.getElementById('btn-show-create-form').addEventListener('click', function () {
+      document.getElementById('create-biz-form').style.display = 'block';
+    });
+    document.getElementById('btn-create-biz').addEventListener('click', createBusiness);
+
+    loadDashboard();
+  </script>
+  ` }) %>

@@ -1,0 +1,77 @@
+<%- include('../layouts/main', { title: 'Ticket Status', body: `
+  <div class="card" style="max-width: 600px; margin: 0 auto; text-align: center;">
+    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2rem;">
+      <div class="status-indicator" id="conn-status"></div>
+      <span id="conn-text" style="color: var(--text-muted); font-size: 0.875rem;">Connecting...</span>
+    </div>
+
+    <h1>Ticket Status</h1>
+    
+    <div style="margin: 2rem 0; padding: 2rem; background: var(--bg); border-radius: 12px; border: 1px solid var(--border);">
+      <h2 style="font-size: 3rem; color: var(--text); margin: 0;" id="ticket-number">Loading...</h2>
+      <div style="display: inline-block; padding: 0.25rem 1rem; background: rgba(59, 130, 246, 0.2); color: var(--primary); border-radius: 99px; font-weight: 600; margin-top: 1rem; text-transform: uppercase;" id="ticket-status">
+        --
+      </div>
+    </div>
+
+    <div style="display: flex; justify-content: space-around; margin: 2rem 0; text-align: left;">
+      <div>
+        <p style="margin:0; font-size: 0.875rem;">Position in Queue</p>
+        <h3 style="font-size: 2rem; margin:0;" id="ticket-position">--</h3>
+      </div>
+      <div>
+        <p style="margin:0; font-size: 0.875rem;">Est. Wait Time</p>
+        <h3 style="font-size: 2rem; margin:0;"><span id="ticket-wait">--</span> min</h3>
+      </div>
+    </div>
+
+  </div>
+`, script: `
+  <script>
+    const ticketId = '${ticketId}';
+    
+    // Initial fetch
+    fetch('/api/queue/ticket/' + ticketId)
+      .then(res => res.json())
+      .then(data => {
+        if(data.success) {
+          document.getElementById('ticket-number').innerText = data.data.ticketNumber;
+          document.getElementById('ticket-status').innerText = data.data.status;
+          document.getElementById('ticket-position').innerText = data.data.position;
+          document.getElementById('ticket-wait').innerText = data.data.predictedWaitTime || '--';
+        }
+      });
+
+    // Socket Setup
+    const socket = io();
+    const statusInd = document.getElementById('conn-status');
+    const statusTxt = document.getElementById('conn-text');
+
+    socket.on('connect', () => {
+      statusInd.classList.add('connected');
+      statusTxt.innerText = 'Live Updates Active';
+      socket.emit('join:ticket_room', { ticketId });
+    });
+
+    socket.on('disconnect', () => {
+      statusInd.classList.remove('connected');
+      statusTxt.innerText = 'Disconnected - Reconnecting...';
+    });
+
+    socket.on('ticket:position', (data) => {
+      document.getElementById('ticket-position').innerText = data.position;
+      document.getElementById('ticket-wait').innerText = data.estimatedWait || '--';
+    });
+
+    socket.on('ticket:status', (data) => {
+      document.getElementById('ticket-status').innerText = data.status;
+    });
+
+    socket.on('ticket:called', (data) => {
+      document.getElementById('ticket-status').innerText = 'CALLED';
+      document.getElementById('ticket-status').style.background = 'rgba(16, 185, 129, 0.2)';
+      document.getElementById('ticket-status').style.color = 'var(--accent)';
+      alert('Your ticket ' + data.ticketNumber + ' has been called! Please proceed.');
+    });
+  </script>
+` }) %>

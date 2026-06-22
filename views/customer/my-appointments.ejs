@@ -1,0 +1,155 @@
+<% var __bookServiceId=bookServiceId || null; %><%- include('../layouts/main', { title: 'My Appointments - ' + appName,
+    body: ` <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold m-0">My Appointments</h2>
+    </div>
+
+    <div class="card shadow-sm border-0 mb-4" id="booking-card" style="display: none;">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Book an Appointment</h5>
+        <div class="row g-3 align-items-end">
+          <div class="col-md-4">
+            <label class="form-label">Date</label>
+            <input type="date" id="book-date" class="form-control">
+          </div>
+          <div class="col-md-4">
+            <button class="btn btn-outline-primary w-100" id="btn-find-slots">Find Available Times</button>
+          </div>
+        </div>
+        <div class="mt-4" id="slot-grid"></div>
+        <div id="book-error" class="text-danger mt-2" style="display:none;"></div>
+      </div>
+    </div>
+
+    <div class="row" id="appt-list">
+      <div class="col-12 text-muted">Loading appointments...</div>
+    </div>
+    `, script: `
+    <script>
+      function esc(str) {
+        if (str === null || str === undefined) return '';
+        const div = document.createElement('div');
+        div.textContent = String(str);
+        return div.innerHTML;
+      }
+
+      var bookServiceId = ${ __bookServiceId ?JSON.stringify(__bookServiceId) : 'null'};
+
+      function loadAppointments() {
+        fetch('/api/appointments/my', { credentials: 'include' })
+          .then(function (res) {
+            if (res.status === 401) { window.location.href = '/login'; return null; }
+            return res.json();
+          })
+          .then(function (data) {
+            if (!data || !data.success) return;
+            const list = document.getElementById('appt-list');
+            if (data.data.length === 0) {
+              list.innerHTML = '<div class="col-12"><p class="text-muted">You have no appointments.</p></div>';
+              return;
+            }
+            list.innerHTML = data.data.map(function (a) {
+              const statusColor = a.status === 'scheduled' ? 'warning' : a.status === 'confirmed' ? 'primary' : a.status === 'completed' ? 'success' : 'secondary';
+              const cancelBtn = (a.status === 'scheduled' || a.status === 'confirmed') ? '<button class="btn btn-outline-danger w-100 mt-2" data-cancel-id="' + a._id + '">Cancel</button>' : '';
+              return '<div class="col-md-6 col-lg-4 mb-4"><div class="card shadow-sm border-0 h-100"><div class="card-body">' +
+                '<p class="text-muted mb-1">' + esc(a.business ? a.business.name : '') + ' - ' + esc(a.service ? a.service.name : '') + '</p>' +
+                '<h5 class="fw-bold mb-2">' + new Date(a.appointmentDate).toLocaleDateString() + '</h5>' +
+                '<h3 class="text-primary mb-3">' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</h3>' +
+                '<span class="badge bg-' + statusColor + ' mb-3">' + esc(a.status.toUpperCase()) + '</span>' +
+                cancelBtn + '</div></div></div>';
+            }).join('');
+            document.querySelectorAll('[data-cancel-id]').forEach(function (btn) {
+              btn.addEventListener('click', function () { cancelAppt(this.getAttribute('data-cancel-id')); });
+            });
+          });
+      }
+
+      loadAppointments();
+
+      if (bookServiceId) {
+        document.getElementById('booking-card').style.display = 'block';
+        const dateInput = document.getElementById('book-date');
+        const today = new Date().toISOString().split('T')[0];
+        dateInput.min = today;
+        dateInput.value = today;
+      }
+
+      async function loadSlots() {
+        const date = document.getElementById('book-date').value;
+        const grid = document.getElementById('slot-grid');
+        const errorBox = document.getElementById('book-error');
+        errorBox.style.display = 'none';
+        if (!date) {
+          errorBox.textContent = 'Please choose a date.';
+          errorBox.style.display = 'block';
+          return;
+        }
+        grid.innerHTML = '<p class="text-muted">Loading available times...</p>';
+        try {
+          const res = await fetch('/api/appointments/slots/' + bookServiceId + '?date=' + date, { credentials: 'include' });
+          const data = await res.json();
+          if (!data.success) {
+            grid.innerHTML = '';
+            errorBox.textContent = data.error || data.message || 'Could not load slots.';
+            errorBox.style.display = 'block';
+            return;
+          }
+          if (data.data.length === 0) {
+            grid.innerHTML = '<p class="text-muted">No available times on this date. Please try a future date.</p>';
+            return;
+          }
+          grid.innerHTML = '<div class="d-flex flex-wrap gap-2">' + data.data.map(function (s) {
+            return '<button class="btn btn-outline-primary btn-sm" data-date="' + date + '" data-start="' + s.startTime + '" data-end="' + s.endTime + '">' + esc(s.startTime) + ' - ' + esc(s.endTime) + '</button>';
+          }).join('') + '</div>';
+          document.querySelectorAll('[data-date]').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+              bookSlot(this.getAttribute('data-date'), this.getAttribute('data-start'), this.getAttribute('data-end'));
+            });
+          });
+        } catch (err) {
+          errorBox.textContent = 'Failed to load available times.';
+          errorBox.style.display = 'block';
+        }
+      }
+
+      async function bookSlot(date, startTime, endTime) {
+        const errorBox = document.getElementById('book-error');
+        errorBox.style.display = 'none';
+        try {
+          const res = await fetch('/api/appointments/book/' + bookServiceId, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ date: date, startTime: startTime, endTime: endTime })
+          });
+          const data = await res.json();
+          if (data.success) {
+            document.getElementById('booking-card').style.display = 'none';
+            loadAppointments();
+            showToast('Appointment booked successfully!', 'success');
+          } else {
+            errorBox.textContent = data.error || data.message || 'Could not book this slot.';
+            errorBox.style.display = 'block';
+            showToast(data.error || data.message || 'Could not book slot.', 'error');
+          }
+        } catch (err) {
+          errorBox.textContent = 'Failed to book appointment.';
+          errorBox.style.display = 'block';
+        }
+      }
+
+      async function cancelAppt(id) {
+        if (confirm('Are you sure you want to cancel this appointment?')) {
+          await fetch('/api/appointments/' + id + '/cancel', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ reason: 'User requested' })
+          });
+          loadAppointments();
+          showToast('Appointment cancelled.', 'warning');
+        }
+      }
+
+      document.getElementById('btn-find-slots').addEventListener('click', loadSlots);
+    </script>
+    ` }) %>

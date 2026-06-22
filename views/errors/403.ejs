@@ -1,0 +1,8 @@
+<%- include('../layouts/main', { title: title + ' - ' + appName, user: typeof user !== 'undefined' ? user : null, body: `
+  <div class="d-flex flex-column align-items-center justify-content-center text-center py-5">
+    <div class="display-1 fw-bold text-danger mb-3"><i class="bi bi-shield-lock"></i></div>
+    <h3 class="mb-3">Access Denied</h3>
+    <p class="text-muted mb-4" style="max-width: 480px;">You don't have permission to view this page with your current account role.</p>
+    <a href="/" class="btn btn-primary"><i class="bi bi-house-door me-1"></i> Back to home</a>
+  </div>
+` }) %>

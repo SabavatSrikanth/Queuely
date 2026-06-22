@@ -1,0 +1,103 @@
+<%- include('../layouts/main', { title: 'Verify Email - ' + appName, body: ` <div class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card shadow-sm border-0 mt-4">
+      <div class="card-body p-4 text-center">
+        <div style="font-size:48px;">📬</div>
+        <h3 class="mb-2">Check your email</h3>
+        <p class="text-muted mb-4">We sent a 6-digit verification code to <strong id="display-email"></strong>. Enter it
+          below to activate your account.If you don't see it, check your spam folder. </p>
+        <div id="errorBox" class="alert alert-danger d-none text-start"></div>
+        <div id="successBox" class="alert alert-success d-none text-start"></div>
+        <div class="mb-4">
+          <input type="text" id="otp-input" class="form-control form-control-lg text-center fw-bold"
+            placeholder="000000" maxlength="6" autocomplete="one-time-code"
+            style="font-size:28px; letter-spacing:12px; border:2px solid #4f46e5;">
+        </div>
+        <button class="btn btn-primary w-100 py-2 mb-3" id="btn-verify">Verify Email</button>
+        <p class="text-muted" style="font-size:13px;">
+          Didn't receive the code? <a href="#" id="btn-resend" class="text-decoration-none">Resend OTP</a>
+        </p>
+        <p style="font-size:12px; color:#aaa;">The code expires in 15 minutes.</p>
+      </div>
+    </div>
+  </div>
+  </div>
+  `, script: `
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const email = params.get('email') || '';
+    document.getElementById('display-email').textContent = email || 'your email';
+
+    const errorBox = document.getElementById('errorBox');
+    const successBox = document.getElementById('successBox');
+
+    function showError(msg) {
+      errorBox.textContent = msg;
+      errorBox.classList.remove('d-none');
+      successBox.classList.add('d-none');
+    }
+
+    function showSuccess(msg) {
+      successBox.textContent = msg;
+      successBox.classList.remove('d-none');
+      errorBox.classList.add('d-none');
+    }
+
+    async function verifyOtp() {
+      const otp = document.getElementById('otp-input').value.trim();
+      const btn = document.getElementById('btn-verify');
+      if (!otp || otp.length !== 6) { showError('Please enter the 6-digit code from your email.'); return; }
+      btn.disabled = true;
+      btn.textContent = 'Verifying...';
+      try {
+        const res = await fetch('/api/auth/verify-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email: email, otp: otp })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showSuccess('Email verified! Redirecting...');
+          setTimeout(function () {
+            window.location.href = data.data.user.role === 'business_owner' ? '/dashboard' : '/';
+          }, 1000);
+        } else {
+          showError(data.error || data.message || 'Invalid OTP. Please try again.');
+          btn.disabled = false;
+          btn.textContent = 'Verify Email';
+        }
+      } catch (err) {
+        showError('Something went wrong. Please try again.');
+        btn.disabled = false;
+        btn.textContent = 'Verify Email';
+      }
+    }
+
+    async function resendOtp() {
+      const btn = document.getElementById('btn-resend');
+      btn.textContent = 'Sending...';
+      btn.style.pointerEvents = 'none';
+      try {
+        await fetch('/api/auth/resend-otp', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email })
+        });
+        showSuccess('A new verification code has been sent to your email.');
+      } catch (err) {
+        showError('Could not resend OTP. Please try again.');
+      } finally {
+        setTimeout(function () {
+          btn.textContent = 'Resend OTP';
+          btn.style.pointerEvents = 'auto';
+        }, 30000);
+      }
+    }
+
+    document.getElementById('btn-verify').addEventListener('click', verifyOtp);
+    document.getElementById('btn-resend').addEventListener('click', function (e) { e.preventDefault(); resendOtp(); });
+    document.getElementById('otp-input').addEventListener('keyup', function (e) { if (e.key === 'Enter') verifyOtp(); });
+    document.getElementById('otp-input').focus();
+  </script>
+  ` }) %>

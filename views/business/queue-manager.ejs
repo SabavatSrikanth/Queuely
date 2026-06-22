@@ -1,0 +1,188 @@
+<%- include('../layouts/main', { title: 'Queue Manager - ' + appName, body: ` <div
+  class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold m-0">Queue Manager</h2>
+  <a href="/dashboard" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back</a>
+  </div>
+
+  <div class="row">
+    <div class="col-md-8 mx-auto">
+      <div class="mb-4">
+        <label class="form-label">Select a service to manage its queue</label>
+        <select class="form-select" id="service-select">
+          <option value="">Loading services...</option>
+        </select>
+      </div>
+
+      <div class="text-center">
+        <div class="d-flex align-items-center justify-content-center mb-3">
+          <div class="status-indicator" id="conn-status"></div>
+          <span id="conn-text" class="text-muted" style="font-size: 0.875rem;">Not connected</span>
+        </div>
+      </div>
+
+      <div class="card shadow-sm border-0 p-4" id="queue-controls" style="display:none;">
+        <h4 class="mb-4 text-center">Service: <span id="svc-name" class="text-primary"></span></h4>
+
+        <div class="d-flex justify-content-around mb-4">
+          <div>
+            <p class="text-muted mb-1">Waiting</p>
+            <h2 id="waiting-count">0</h2>
+          </div>
+          <div>
+            <p class="text-muted mb-1">Currently Called</p>
+            <h2 id="called-ticket" class="text-success">--</h2>
+          </div>
+        </div>
+
+        <button class="btn btn-success btn-lg w-100 mb-3" id="btn-call-next"><i class="bi bi-megaphone-fill"></i> Call
+          Next Ticket</button>
+
+        <div class="row g-2">
+          <div class="col-4"><button class="btn btn-outline-primary w-100" id="btn-serve">Start Serving</button></div>
+          <div class="col-4"><button class="btn btn-outline-success w-100" id="btn-done">Mark Done</button></div>
+          <div class="col-4"><button class="btn btn-outline-danger w-100" id="btn-noshow">No Show</button></div>
+        </div>
+        <div id="action-error" class="text-danger mt-3 text-center" style="display:none;"></div>
+      </div>
+    </div>
+  </div>
+  `, script: `
+  <script>
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    let currentServiceId = '';
+    let calledTicketId = '';
+    const socket = io();
+
+    socket.on('connect', function () {
+      document.getElementById('conn-status').classList.add('connected');
+      document.getElementById('conn-text').innerText = 'Live updates active';
+    });
+    socket.on('disconnect', function () {
+      document.getElementById('conn-status').classList.remove('connected');
+      document.getElementById('conn-text').innerText = 'Disconnected — reconnecting...';
+    });
+    socket.on('queue:live_update', function (snapshot) {
+      if (snapshot.serviceId !== currentServiceId) return;
+      renderSnapshot(snapshot);
+    });
+
+    function renderSnapshot(snapshot) {
+      document.getElementById('waiting-count').innerText = snapshot.waitingCount ?? 0;
+      document.getElementById('called-ticket').innerText = (snapshot.nowServing && snapshot.nowServing.ticketNumber) || '--';
+      if (snapshot.nowServing) {
+        calledTicketId = snapshot.nowServing.ticketId || calledTicketId;
+      }
+    }
+
+    async function populateServices() {
+      const select = document.getElementById('service-select');
+      try {
+        const meRes = await fetch('/api/auth/me');
+        const me = await meRes.json();
+        if (!me.success || !me.data.businessId) {
+          select.innerHTML = '<option value="">No business found — create one on the Dashboard first</option>';
+          return;
+        }
+        const res = await fetch('/api/services?business=' + me.data.businessId);
+        const data = await res.json();
+        if (!data.success || data.data.length === 0) {
+          select.innerHTML = '<option value="">No services found — add one under Branches & Services</option>';
+          return;
+        }
+        select.innerHTML = '<option value="">-- Choose a service --</option>' +
+          data.data.filter(function (s) { return s.walkinEnabled; }).map(function (s) {
+            return '<option value="' + s._id + '" data-name="' + esc(s.name) + '">' + esc(s.name) + '</option>';
+          }).join('');
+      } catch (err) {
+        select.innerHTML = '<option value="">Failed to load services</option>';
+      }
+    }
+
+    function loadQueue() {
+      const select = document.getElementById('service-select');
+      currentServiceId = select.value;
+      if (!currentServiceId) {
+        document.getElementById('queue-controls').style.display = 'none';
+        return;
+      }
+      const selectedOption = select.options[select.selectedIndex];
+      document.getElementById('svc-name').innerText = selectedOption.dataset.name || currentServiceId;
+      document.getElementById('queue-controls').style.display = 'block';
+      socket.emit('join:queue_room', { serviceId: currentServiceId });
+      refreshQueue();
+    }
+
+    async function refreshQueue() {
+      try {
+        const res = await fetch('/api/queue/' + currentServiceId + '/live');
+        const data = await res.json();
+        if (data.success) renderSnapshot(data.data);
+      } catch (e) { }
+    }
+
+    function showActionError(msg) {
+      const box = document.getElementById('action-error');
+      box.textContent = msg;
+      box.style.display = 'block';
+      setTimeout(function () { box.style.display = 'none'; }, 4000);
+      showToast(msg, 'error');
+    }
+
+    async function callNext() {
+      try {
+        const res = await fetch('/api/queue/call-next/' + currentServiceId, { method: 'PUT', headers: { 'Content-Type': 'application/json' } });
+        const data = await res.json();
+        if (data.success) {
+          calledTicketId = data.data._id;
+          refreshQueue();
+          showToast('Ticket ' + data.data.ticketNumber + ' called!', 'success');
+        } else {
+          showActionError(data.error || data.message || 'Could not call next ticket');
+        }
+      } catch (e) { showActionError('Network error calling next ticket'); }
+    }
+
+    async function serveCurrent() {
+      if (!calledTicketId) return showActionError('Call a ticket first');
+      const res = await fetch('/api/queue/serving/' + calledTicketId, { method: 'PUT', headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (!data.success) showActionError(data.error || data.message || 'Could not start serving');
+      else showToast('Now serving customer!', 'info');
+      refreshQueue();
+    }
+
+    async function markDone() {
+      if (!calledTicketId) return showActionError('Call a ticket first');
+      const res = await fetch('/api/queue/served/' + calledTicketId, { method: 'PUT', headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (!data.success) showActionError(data.error || data.message || 'Could not mark as served');
+      else showToast('Customer served successfully!', 'success');
+      calledTicketId = '';
+      refreshQueue();
+    }
+
+    async function markNoShow() {
+      if (!calledTicketId) return showActionError('Call a ticket first');
+      const res = await fetch('/api/queue/no-show/' + calledTicketId, { method: 'PUT', headers: { 'Content-Type': 'application/json' } });
+      const data = await res.json();
+      if (!data.success) showActionError(data.error || data.message || 'Could not mark as no-show');
+      else showToast('Marked as no-show.', 'warning');
+      calledTicketId = '';
+      refreshQueue();
+    }
+
+    document.getElementById('service-select').addEventListener('change', loadQueue);
+    document.getElementById('btn-call-next').addEventListener('click', callNext);
+    document.getElementById('btn-serve').addEventListener('click', serveCurrent);
+    document.getElementById('btn-done').addEventListener('click', markDone);
+    document.getElementById('btn-noshow').addEventListener('click', markNoShow);
+
+    populateServices();
+  </script>
+  ` }) %>

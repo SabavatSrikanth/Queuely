@@ -1,0 +1,174 @@
+<%- include('../layouts/main', { title: 'Live Queue Status' , user: typeof user !=='undefined' ? user : null, body: `
+  <div class="card shadow-sm border-0 p-4" style="max-width: 600px; margin: 0 auto; text-align: center;">
+  <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2rem;">
+    <div class="status-indicator" id="conn-status"></div>
+    <span id="conn-text" style="color: var(--text-muted); font-size: 0.875rem;">Connecting...</span>
+  </div>
+
+  <h1>Live Queue Status</h1>
+  <p>Service: <span id="service-name" style="color: var(--text); font-weight: 600;">Loading...</span></p>
+
+  <div style="margin: 3rem 0;">
+    <h2 style="font-size: 4rem; color: var(--primary); margin: 0;" id="queue-size">--</h2>
+    <p>People waiting in queue</p>
+  </div>
+
+  <div
+    style="background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; margin-bottom: 2rem;">
+    <h3>Currently Serving</h3>
+    <div id="called-ticket" style="font-size: 2rem; font-weight: bold; color: var(--accent);">None</div>
+  </div>
+
+  <div id="join-form">
+    <div class="mb-2">
+      <input type="text" id="guest-name" class="form-control" placeholder="Your name" required>
+    </div>
+    <div class="mb-3">
+      <input type="tel" id="guest-phone" class="form-control" placeholder="Your phone number" required>
+    </div>
+    <button class="btn btn-primary" style="width: 100%;" id="join-btn">Join Queue Now</button>
+    <div id="join-error" class="text-danger mt-2" style="display:none; font-size: 0.875rem;"></div>
+  </div>
+
+  <div id="join-result"
+    style="margin-top: 1rem; display: none; padding: 1.5rem; border-radius: 12px; border: 1px solid var(--border);">
+    <p style="margin: 0; color: var(--text-muted);">Your Ticket Number:</p>
+    <h2 id="my-ticket-number" style="color: var(--accent); margin: 0.5rem 0; font-size: 2.5rem;"></h2>
+
+    <div style="display: flex; justify-content: center; gap: 2rem; margin: 1.5rem 0;">
+      <div style="text-align: center;">
+        <div style="font-size: 1.8rem; font-weight: 700; color: var(--primary);" id="my-position">--</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">
+          Position</div>
+      </div>
+      <div style="text-align: center;">
+        <div style="font-size: 1.8rem; font-weight: 700; color: var(--primary);" id="my-wait-time">--</div>
+        <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px;">Est.
+          Wait (mins)</div>
+      </div>
+    </div>
+
+    <div id="qr-section" style="display:none; margin: 1.5rem 0;">
+      <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">Show this at the counter</p>
+      <img id="qr-code-img" src="" alt="QR Code"
+        style="width: 160px; height: 160px; border-radius: 8px; border: 1px solid var(--border); padding: 8px;">
+      <p style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.5rem;">Scan to track your ticket</p>
+    </div>
+
+    <a id="my-ticket-link" href="#" class="btn btn-primary" style="margin-top: 0.5rem; width: 100%;">View My Status</a>
+
+    <div style="margin-top: 1rem;">
+      <button id="btn-copy-link" class="btn btn-outline-secondary btn-sm w-100">📋 Copy Ticket Link</button>
+      <div id="copy-success" style="display:none; font-size:0.8rem; color: var(--accent); margin-top: 0.4rem;">Link
+        copied to clipboard!</div>
+    </div>
+  </div>
+  </div>
+  `, script: `
+  <script>
+    const serviceId = '${serviceId}';
+    const businessSlug = '${businessSlug}';
+
+    function renderSnapshot(snapshot) {
+      document.getElementById('queue-size').innerText = snapshot.waitingCount ?? snapshot.currentQueueCount ?? '--';
+      document.getElementById('called-ticket').innerText = (snapshot.nowServing && snapshot.nowServing.ticketNumber) || 'None';
+      document.getElementById('service-name').innerText = snapshot.serviceName || ('Service ' + serviceId.substring(0, 6));
+      if (snapshot.isAcceptingQueue === false) {
+        document.getElementById('join-btn').disabled = true;
+        document.getElementById('join-btn').innerText = 'Queue Closed';
+      }
+    }
+
+    fetch('/api/queue/' + serviceId + '/live')
+      .then(function (res) { return res.json(); })
+      .then(function (data) { if (data.success) renderSnapshot(data.data); })
+      .catch(function () { });
+
+    const socket = io();
+    const statusInd = document.getElementById('conn-status');
+    const statusTxt = document.getElementById('conn-text');
+
+    socket.on('connect', function () {
+      statusInd.classList.add('connected');
+      statusTxt.innerText = 'Live Updates Active';
+      socket.emit('join:queue_room', { serviceId: serviceId });
+    });
+
+    socket.on('disconnect', function () {
+      statusInd.classList.remove('connected');
+      statusTxt.innerText = 'Disconnected - Reconnecting...';
+    });
+
+    socket.on('queue:live_update', function (snapshot) {
+      renderSnapshot(snapshot);
+    });
+
+    async function joinQueue() {
+      const name = document.getElementById('guest-name').value.trim();
+      const phone = document.getElementById('guest-phone').value.trim();
+      const errorBox = document.getElementById('join-error');
+      errorBox.style.display = 'none';
+
+      if (!name || !phone) {
+        errorBox.textContent = 'Please enter your name and phone number.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      const btn = document.getElementById('join-btn');
+      btn.disabled = true;
+      btn.innerText = 'Joining...';
+
+      try {
+        const res = await fetch('/api/queue/join/' + serviceId, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ guestInfo: { name: name, phone: phone } })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('join-form').style.display = 'none';
+          document.getElementById('join-result').style.display = 'block';
+          document.getElementById('my-ticket-number').innerText = data.data.ticketNumber;
+          document.getElementById('my-ticket-link').href = '/ticket-status/' + data.data._id;
+          document.getElementById('my-position').innerText = data.data.position || '--';
+          document.getElementById('my-wait-time').innerText = data.data.predictedWaitTime || '--';
+
+          if (data.data.qrCodeUrl) {
+            document.getElementById('qr-code-img').src = data.data.qrCodeUrl;
+            document.getElementById('qr-section').style.display = 'block';
+          }
+
+          if (data.data.shareableLink) {
+            document.getElementById('btn-copy-link').setAttribute('data-link', data.data.shareableLink);
+          }
+
+          socket.emit('join:ticket_room', { ticketId: data.data._id });
+        } else {
+          errorBox.textContent = data.error || data.message || 'Could not join the queue.';
+          errorBox.style.display = 'block';
+          btn.disabled = false;
+          btn.innerText = 'Join Queue Now';
+        }
+      } catch (err) {
+        errorBox.textContent = 'Failed to join queue. Please try again.';
+        errorBox.style.display = 'block';
+        btn.disabled = false;
+        btn.innerText = 'Join Queue Now';
+      }
+    }
+
+    document.getElementById('join-btn').addEventListener('click', joinQueue);
+
+    document.getElementById('btn-copy-link').addEventListener('click', function () {
+      const link = this.getAttribute('data-link') || window.location.href;
+      navigator.clipboard.writeText(link).then(function () {
+        document.getElementById('copy-success').style.display = 'block';
+        setTimeout(function () {
+          document.getElementById('copy-success').style.display = 'none';
+        }, 3000);
+      });
+    });
+  </script>
+  ` }) %>

@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>
+    <%= typeof title !=='undefined' ? title : appName %>
+  </title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-dark: #4338ca;
+      --accent: #10b981;
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --text: #1f2937;
+      --text-muted: #6b7280;
+      --border: #e5e7eb;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+    }
+
+    .navbar-brand {
+      font-weight: 600;
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 0.5rem;
+      height: 0.5rem;
+      border-radius: 50%;
+      background-color: #9ca3af;
+      margin-right: 0.4rem;
+    }
+
+    .status-indicator.connected {
+      background-color: var(--accent);
+    }
+
+    /* Toast Notifications */
+    #toast-container {
+      position: fixed;
+      top: 1.5rem;
+      right: 1.5rem;
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      pointer-events: none;
+    }
+
+    .toast-item {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      padding: 0.875rem 1.25rem;
+      border-radius: 12px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #fff;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+      pointer-events: all;
+      animation: toast-in 0.3s ease;
+      max-width: 320px;
+    }
+
+    .toast-item.success {
+      background: #10b981;
+    }
+
+    .toast-item.error {
+      background: #ef4444;
+    }
+
+    .toast-item.info {
+      background: #4f46e5;
+    }
+
+    .toast-item.warning {
+      background: #f59e0b;
+    }
+
+    .toast-item.toast-out {
+      animation: toast-out 0.3s ease forwards;
+    }
+
+    @keyframes toast-in {
+      from {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateX(0);
+      }
+    }
+
+    @keyframes toast-out {
+      from {
+        opacity: 1;
+        transform: translateX(0);
+      }
+
+      to {
+        opacity: 0;
+        transform: translateX(100%);
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <!-- Toast Container -->
+  <div id="toast-container"></div>
+
+  <!-- Global Navbar -->
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <div class="container">
+      <a class="navbar-brand" href="/"><i class="bi bi-layers-fill"></i>
+        <%= appName %>
+      </a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarNav">
+        <ul class="navbar-nav ms-auto">
+          <% if (typeof user !=='undefined' && user) { %>
+            <% if (['business_owner', 'branch_manager' , 'staff' ].includes(user.role)) { %>
+              <li class="nav-item"><a class="nav-link" href="/dashboard">Dashboard</a></li>
+              <% } else if (user.role==='super_admin' ) { %>
+                <li class="nav-item"><a class="nav-link" href="/admin">Admin</a></li>
+                <% } %>
+                  <% if (user.role==='customer' ) { %>
+                    <li class="nav-item"><a class="nav-link" href="/my-tickets">My Tickets</a></li>
+                    <li class="nav-item"><a class="nav-link" href="/my-appointments">My Appointments</a></li>
+                    <% } %>
+                      <li class="nav-item"><a class="nav-link" href="/logout">Logout (<%= user.name %>)</a></li>
+                      <% } else { %>
+                        <li class="nav-item"><a class="nav-link" href="/login">Login</a></li>
+                        <li class="nav-item"><a class="nav-link" href="/register">Register</a></li>
+                        <% } %>
+        </ul>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <%- body %>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    function showToast(message, type, duration) {
+      type = type || 'success';
+      duration = duration || 3000;
+      const container = document.getElementById('toast-container');
+      const icons = { success: '✅', error: '❌', info: 'ℹ️', warning: '⚠️' };
+      const toast = document.createElement('div');
+      toast.className = 'toast-item ' + type;
+      toast.innerHTML = '<span>' + (icons[type] || '✅') + '</span><span>' + message + '</span>';
+      container.appendChild(toast);
+      setTimeout(function () {
+        toast.classList.add('toast-out');
+        setTimeout(function () { toast.remove(); }, 300);
+      }, duration);
+    }
+  </script>
+  <%- typeof script !=='undefined' ? script : '' %>
+</body>
+
+</html>

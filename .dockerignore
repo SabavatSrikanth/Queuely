@@ -1,0 +1,27 @@
+node_modules
+npm-debug.log*
+
+# Secrets — never bake these into an image
+.env
+.env.*
+!.env.example
+
+# VCS
+.git
+.gitignore
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+
+# Logs & temp
+*.log
+*.tmp
+coverage
+.nyc_output
+
+# Dev-only docs and reports
+*.md
+!README.md

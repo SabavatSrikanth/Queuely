@@ -1,0 +1,144 @@
+<%- include('../layouts/main', { title: 'Appointments - ' + appName, body: ` <div
+  class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold m-0">Manage Appointments</h2>
+  </div>
+
+  <div class="row g-2 mb-4">
+    <div class="col-md-3">
+      <input type="date" id="filter-date" class="form-control">
+    </div>
+    <div class="col-md-3">
+      <select id="filter-status" class="form-select">
+        <option value="">All statuses</option>
+        <option value="scheduled">Scheduled</option>
+        <option value="confirmed">Confirmed</option>
+        <option value="checked_in">Checked In</option>
+        <option value="completed">Completed</option>
+        <option value="cancelled">Cancelled</option>
+        <option value="no_show">No Show</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <button class="btn btn-outline-secondary" id="btn-clear-filters">Clear Filters</button>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <div class="table-responsive">
+        <table class="table align-middle">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Time</th>
+              <th>Customer</th>
+              <th>Service</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody id="appt-table-body">
+            <tr>
+              <td colspan="6" class="text-center text-muted">Loading...</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  `, script: `
+  <script>
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    let businessId = null;
+    const statusBadge = {
+      scheduled: 'warning', confirmed: 'primary', checked_in: 'info',
+      completed: 'success', cancelled: 'secondary', no_show: 'danger',
+    };
+
+    async function init() {
+      const meRes = await fetch('/api/auth/me');
+      const me = await meRes.json();
+      if (!me.success || !me.data.businessId) {
+        document.getElementById('appt-table-body').innerHTML = '<tr><td colspan="6" class="text-center text-muted">Create a business on the Dashboard first.</td></tr>';
+        return;
+      }
+      businessId = me.data.businessId;
+      loadAppointments();
+    }
+
+    async function loadAppointments() {
+      const date = document.getElementById('filter-date').value;
+      const status = document.getElementById('filter-status').value;
+      let url = '/api/appointments/business/' + businessId + '?';
+      if (date) url += 'date=' + date + '&';
+      if (status) url += 'status=' + status;
+
+      const res = await fetch(url);
+      const data = await res.json();
+      const body = document.getElementById('appt-table-body');
+      if (!data.success || data.data.length === 0) {
+        body.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No appointments found.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = data.data.map(function (a) {
+        const confirmBtn = a.status === 'scheduled' ? '<button class="btn btn-sm btn-outline-primary me-1" data-action="confirm" data-id="' + a._id + '">Confirm</button>' : '';
+        const checkinBtn = (a.status === 'scheduled' || a.status === 'confirmed') ? '<button class="btn btn-sm btn-outline-info me-1" data-action="check-in" data-id="' + a._id + '">Check In</button>' : '';
+        const completeBtn = a.status === 'checked_in' ? '<button class="btn btn-sm btn-outline-success me-1" data-action="complete" data-id="' + a._id + '">Complete</button>' : '';
+        const cancelBtn = (a.status === 'scheduled' || a.status === 'confirmed') ? '<button class="btn btn-sm btn-outline-danger" data-action="cancel" data-id="' + a._id + '">Cancel</button>' : '';
+        return '<tr>' +
+          '<td>' + new Date(a.appointmentDate).toLocaleDateString() + '</td>' +
+          '<td>' + esc(a.startTime) + ' - ' + esc(a.endTime) + '</td>' +
+          '<td>' + esc(a.customer ? a.customer.name : (a.guestInfo ? a.guestInfo.name + ' (guest)' : 'Unknown')) + '</td>' +
+          '<td>' + esc(a.service ? a.service.name : '') + '</td>' +
+          '<td><span class="badge bg-' + (statusBadge[a.status] || 'secondary') + '">' + esc(a.status.replace('_', ' ').toUpperCase()) + '</span></td>' +
+          '<td>' + confirmBtn + checkinBtn + completeBtn + cancelBtn + '</td>' +
+          '</tr>';
+      }).join('');
+
+      document.querySelectorAll('[data-action]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          doAction(this.getAttribute('data-id'), this.getAttribute('data-action'));
+        });
+      });
+    }
+
+    async function doAction(id, action) {
+      const body = action === 'cancel' ? JSON.stringify({ reason: 'Cancelled by staff' }) : undefined;
+      const res = await fetch('/api/appointments/' + id + '/' + action, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: body,
+      });
+      const data = await res.json();
+      if (!data.success) {
+        showToast(data.error || data.message || 'Action failed', 'error');
+      } else {
+        const messages = {
+          confirm: 'Appointment confirmed!',
+          'check-in': 'Customer checked in!',
+          complete: 'Appointment completed!',
+          cancel: 'Appointment cancelled.'
+        };
+        showToast(messages[action] || 'Done!', action === 'cancel' ? 'warning' : 'success');
+      }
+      loadAppointments();
+    }
+
+    document.getElementById('filter-date').addEventListener('change', loadAppointments);
+    document.getElementById('filter-status').addEventListener('change', loadAppointments);
+    document.getElementById('btn-clear-filters').addEventListener('click', function () {
+      document.getElementById('filter-date').value = '';
+      document.getElementById('filter-status').value = '';
+      loadAppointments();
+    });
+
+    init();
+  </script>
+  ` }) %>

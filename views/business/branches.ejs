@@ -1,0 +1,286 @@
+<%- include('../layouts/main', { title: 'Branches & Services - ' + appName, body: ` <div
+  class="d-flex justify-content-between align-items-center mb-4">
+  <h2 class="fw-bold m-0">Branches & Services</h2>
+  </div>
+
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link active" id="tab-branches" href="#">Branches</a></li>
+    <li class="nav-item"><a class="nav-link" id="tab-services" href="#">Services</a></li>
+  </ul>
+
+  <div id="panel-branches">
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" id="btn-add-branch"><i class="bi bi-plus-lg"></i> Add Branch</button>
+    </div>
+    <div class="card shadow-sm border-0 mb-4" id="branch-form-card" style="display:none;">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6"><input type="text" id="branch-name" class="form-control" placeholder="Branch name">
+          </div>
+          <div class="col-md-6"><input type="text" id="branch-city" class="form-control" placeholder="City"></div>
+          <div class="col-md-6"><input type="text" id="branch-street" class="form-control" placeholder="Street address">
+          </div>
+          <div class="col-md-6"><input type="text" id="branch-country" class="form-control" placeholder="Country"></div>
+          <div class="col-md-6"><input type="text" id="branch-phone" class="form-control" placeholder="Phone"></div>
+          <div class="col-md-6"><input type="email" id="branch-email" class="form-control" placeholder="Email"></div>
+        </div>
+        <button class="btn btn-success mt-3" id="btn-save-branch">Save Branch</button>
+        <div id="branch-error" class="text-danger mt-2" style="display:none;"></div>
+      </div>
+    </div>
+    <div id="branch-list" class="row g-3">
+      <div class="col-12 text-muted">Loading branches...</div>
+    </div>
+  </div>
+
+  <div id="panel-services" style="display:none;">
+    <div class="d-flex justify-content-end mb-3">
+      <button class="btn btn-primary" id="btn-add-service"><i class="bi bi-plus-lg"></i> Add Service</button>
+    </div>
+    <div class="card shadow-sm border-0 mb-4" id="service-form-card" style="display:none;">
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-md-6"><input type="text" id="service-name" class="form-control" placeholder="Service name">
+          </div>
+          <div class="col-md-6"><input type="text" id="service-code" class="form-control"
+              placeholder="Short code (e.g. CON)" maxlength="10"></div>
+          <div class="col-md-6">
+            <select id="service-branch" class="form-select">
+              <option value="">Available at all branches</option>
+            </select>
+          </div>
+          <div class="col-md-6"><input type="number" id="service-duration" class="form-control"
+              placeholder="Est. service time (min)" value="15"></div>
+          <div class="col-md-4">
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" id="service-walkin" checked>
+              <label class="form-check-label">Walk-in queue</label>
+            </div>
+          </div>
+          <div class="col-md-4">
+            <div class="form-check form-switch mt-2">
+              <input class="form-check-input" type="checkbox" id="service-appointments" checked>
+              <label class="form-check-label">Appointments</label>
+            </div>
+          </div>
+        </div>
+        <button class="btn btn-success mt-3" id="btn-save-service">Save Service</button>
+        <div id="service-error" class="text-danger mt-2" style="display:none;"></div>
+      </div>
+    </div>
+    <div id="service-list" class="row g-3">
+      <div class="col-12 text-muted">Loading services...</div>
+    </div>
+  </div>
+  `, script: `
+  <script>
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    let businessId = null;
+
+    function showTab(tab) {
+      document.getElementById('panel-branches').style.display = tab === 'branches' ? 'block' : 'none';
+      document.getElementById('panel-services').style.display = tab === 'services' ? 'block' : 'none';
+      document.getElementById('tab-branches').classList.toggle('active', tab === 'branches');
+      document.getElementById('tab-services').classList.toggle('active', tab === 'services');
+    }
+
+    function toggleBranchForm() {
+      const card = document.getElementById('branch-form-card');
+      card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function toggleServiceForm() {
+      const card = document.getElementById('service-form-card');
+      card.style.display = card.style.display === 'none' ? 'block' : 'none';
+    }
+
+    async function init() {
+      const meRes = await fetch('/api/auth/me');
+      const me = await meRes.json();
+      if (!me.success || !me.data.businessId) {
+        document.getElementById('branch-list').innerHTML = '<div class="col-12 text-muted">Create a business on the Dashboard first.</div>';
+        document.getElementById('service-list').innerHTML = '<div class="col-12 text-muted">Create a business on the Dashboard first.</div>';
+        return;
+      }
+      businessId = me.data.businessId;
+      loadBranches();
+      loadServices();
+    }
+
+    async function loadBranches() {
+      const res = await fetch('/api/businesses/' + businessId + '/branches');
+      const data = await res.json();
+      const list = document.getElementById('branch-list');
+      const branchSelect = document.getElementById('service-branch');
+
+      if (!data.success || data.data.length === 0) {
+        list.innerHTML = '<div class="col-12 text-muted">No branches yet — add your first one above.</div>';
+        return;
+      }
+
+      branchSelect.innerHTML = '<option value="">Available at all branches</option>' +
+        data.data.map(function (b) {
+          return '<option value="' + b._id + '">' + esc(b.name) + '</option>';
+        }).join('');
+
+      list.innerHTML = data.data.map(function (b) {
+        return '<div class="col-md-6">' +
+          '<div class="card shadow-sm border-0 h-100">' +
+          '<div class="card-body">' +
+          '<h5 class="fw-bold">' + esc(b.name) + ' ' + (b.isHeadquarters ? '<span class="badge bg-secondary">HQ</span>' : '') + '</h5>' +
+          '<p class="text-muted mb-2"><i class="bi bi-geo-alt"></i> ' + esc(b.address ? [b.address.street, b.address.city, b.address.country].filter(Boolean).join(', ') : '') + '</p>' +
+          '<span class="badge ' + (b.isOpen ? 'bg-success' : 'bg-danger') + '">' + (b.isOpen ? 'Open' : 'Closed') + '</span>' +
+          '<button class="btn btn-sm btn-outline-secondary float-end" data-branch-id="' + b._id + '">Toggle Open/Closed</button>' +
+          '</div>' +
+          '</div>' +
+          '</div>';
+      }).join('');
+
+      document.querySelectorAll('[data-branch-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { toggleBranch(this.getAttribute('data-branch-id')); });
+      });
+    }
+
+    async function createBranch() {
+      const errorBox = document.getElementById('branch-error');
+      errorBox.style.display = 'none';
+      const name = document.getElementById('branch-name').value.trim();
+      if (!name) {
+        errorBox.textContent = 'Branch name is required.';
+        errorBox.style.display = 'block';
+        return;
+      }
+      try {
+        const res = await fetch('/api/businesses/' + businessId + '/branches', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            address: {
+              street: document.getElementById('branch-street').value,
+              city: document.getElementById('branch-city').value,
+              country: document.getElementById('branch-country').value,
+            },
+            contact: {
+              phone: document.getElementById('branch-phone').value,
+              email: document.getElementById('branch-email').value,
+            },
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          toggleBranchForm();
+          loadBranches();
+        } else {
+          errorBox.textContent = data.error || data.message || 'Could not create branch.';
+          errorBox.style.display = 'block';
+        }
+      } catch (err) {
+        errorBox.textContent = 'Request failed.';
+        errorBox.style.display = 'block';
+      }
+    }
+
+    async function toggleBranch(id) {
+      await fetch('/api/branches/' + id + '/toggle', { method: 'PUT' });
+      loadBranches();
+    }
+
+    async function loadServices() {
+      const res = await fetch('/api/services?business=' + businessId);
+      const data = await res.json();
+      const list = document.getElementById('service-list');
+      if (!data.success || data.data.length === 0) {
+        list.innerHTML = '<div class="col-12 text-muted">No services yet — add your first one above.</div>';
+        return;
+      }
+      list.innerHTML = data.data.map(function (s) {
+        return '<div class="col-md-6">' +
+          '<div class="card shadow-sm border-0 h-100">' +
+          '<div class="card-body">' +
+          '<h5 class="fw-bold">' + esc(s.name) + ' <span class="badge bg-light text-dark border">' + esc(s.code) + '</span></h5>' +
+          '<p class="text-muted mb-2">Est. ' + esc(s.estimatedServiceTime) + ' min per customer</p>' +
+          '<span class="badge ' + (s.isAcceptingQueue ? 'bg-success' : 'bg-secondary') + ' me-1">Queue: ' + (s.isAcceptingQueue ? 'On' : 'Off') + '</span>' +
+          '<span class="badge ' + (s.appointmentEnabled ? 'bg-success' : 'bg-secondary') + '">Appointments: ' + (s.appointmentEnabled ? 'On' : 'Off') + '</span>' +
+          '<div class="mt-3 d-flex gap-2">' +
+          '<button class="btn btn-sm btn-outline-primary" data-toggle-queue="' + s._id + '">Toggle Queue</button>' +
+          '<button class="btn btn-sm btn-outline-primary" data-toggle-appts="' + s._id + '">Toggle Appointments</button>' +
+          '</div>' +
+          '</div>' +
+          '</div>' +
+          '</div>';
+      }).join('');
+
+      document.querySelectorAll('[data-toggle-queue]').forEach(function (btn) {
+        btn.addEventListener('click', function () { toggleServiceQueue(this.getAttribute('data-toggle-queue')); });
+      });
+      document.querySelectorAll('[data-toggle-appts]').forEach(function (btn) {
+        btn.addEventListener('click', function () { toggleServiceAppts(this.getAttribute('data-toggle-appts')); });
+      });
+    }
+
+    async function createService() {
+      const errorBox = document.getElementById('service-error');
+      errorBox.style.display = 'none';
+      const name = document.getElementById('service-name').value.trim();
+      const code = document.getElementById('service-code').value.trim();
+      if (!name || !code) {
+        errorBox.textContent = 'Service name and code are required.';
+        errorBox.style.display = 'block';
+        return;
+      }
+      const branchId = document.getElementById('service-branch').value;
+      try {
+        const url = branchId ? ('/api/branches/' + branchId + '/services') : '/api/services';
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: name,
+            code: code,
+            business: businessId,
+            estimatedServiceTime: parseInt(document.getElementById('service-duration').value, 10) || 15,
+            walkinEnabled: document.getElementById('service-walkin').checked,
+            appointmentEnabled: document.getElementById('service-appointments').checked,
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          toggleServiceForm();
+          loadServices();
+        } else {
+          errorBox.textContent = data.error || data.message || 'Could not create service.';
+          errorBox.style.display = 'block';
+        }
+      } catch (err) {
+        errorBox.textContent = 'Request failed.';
+        errorBox.style.display = 'block';
+      }
+    }
+
+    async function toggleServiceQueue(id) {
+      await fetch('/api/services/' + id + '/toggle-queue', { method: 'PUT' });
+      loadServices();
+    }
+
+    async function toggleServiceAppts(id) {
+      await fetch('/api/services/' + id + '/toggle-appointments', { method: 'PUT' });
+      loadServices();
+    }
+
+    document.getElementById('tab-branches').addEventListener('click', function (e) { e.preventDefault(); showTab('branches'); });
+    document.getElementById('tab-services').addEventListener('click', function (e) { e.preventDefault(); showTab('services'); });
+    document.getElementById('btn-add-branch').addEventListener('click', toggleBranchForm);
+    document.getElementById('btn-save-branch').addEventListener('click', createBranch);
+    document.getElementById('btn-add-service').addEventListener('click', toggleServiceForm);
+    document.getElementById('btn-save-service').addEventListener('click', createService);
+
+    init();
+  </script>
+  ` }) %>

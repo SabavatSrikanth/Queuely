@@ -1,0 +1,77 @@
+<%- include('../layouts/main', { title: 'Home - ' + appName, body: ` <div class="text-center py-5">
+  <h1 class="display-4 fw-bold text-primary mb-3">Skip the Waiting Room</h1>
+  <p class="lead text-muted mb-5">Join queues instantly, book appointments, and track your live wait time from your
+    phone.</p>
+  <div class="input-group mb-5 mx-auto" style="max-width: 600px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
+    <input type="text" class="form-control form-control-lg border-0" id="search-input"
+      placeholder="Search for hospitals, salons, banks...">
+    <button class="btn btn-primary px-4" type="button" id="btn-search"><i class="bi bi-search"></i> Search</button>
+  </div>
+  </div>
+
+  <div class="row g-4 mt-2" id="business-list">
+    <div class="col-12 text-muted text-center">Loading businesses...</div>
+  </div>
+  `, script: `
+  <script>
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const div = document.createElement('div');
+      div.textContent = String(str);
+      return div.innerHTML;
+    }
+
+    let allBusinesses = [];
+
+    function renderBusinesses(items) {
+      const list = document.getElementById('business-list');
+      if (items.length === 0) {
+        list.innerHTML = '<div class="col-12 text-center text-muted">No businesses found.</div>';
+        return;
+      }
+      list.innerHTML = items.map(function (b) {
+        return '<div class="col-md-4">' +
+          '<div class="card h-100 shadow-sm border-0">' +
+          '<div class="card-body">' +
+          '<h5 class="card-title fw-bold">' + esc(b.name) + '</h5>' +
+          '<p class="card-text text-muted mb-3"><i class="bi bi-geo-alt"></i> ' + esc(b.address ? b.address.city : '') + ', ' + esc(b.address ? b.address.country : '') + '</p>' +
+          '<span class="badge bg-secondary mb-3">' + esc(b.category) + '</span>' +
+          '<a href="/businesses/' + encodeURIComponent(b.slug) + '" class="btn btn-outline-primary w-100 mt-auto">View Services</a>' +
+          '</div>' +
+          '</div>' +
+          '</div>';
+      }).join('');
+    }
+
+    function filterBusinesses() {
+      const term = document.getElementById('search-input').value.trim().toLowerCase();
+      if (!term) {
+        renderBusinesses(allBusinesses);
+        return;
+      }
+      const filtered = allBusinesses.filter(function (b) {
+        return (b.name && b.name.toLowerCase().includes(term)) ||
+          (b.category && b.category.toLowerCase().includes(term)) ||
+          (b.address && b.address.city && b.address.city.toLowerCase().includes(term));
+      });
+      renderBusinesses(filtered);
+    }
+
+    document.getElementById('btn-search').addEventListener('click', filterBusinesses);
+    document.getElementById('search-input').addEventListener('keyup', function (e) {
+      if (e.key === 'Enter') filterBusinesses();
+    });
+
+    fetch('/api/businesses')
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.success && data.data) {
+          allBusinesses = data.data;
+          renderBusinesses(allBusinesses);
+        }
+      })
+      .catch(function () {
+        document.getElementById('business-list').innerHTML = '<div class="col-12 text-center text-muted">Could not load businesses.</div>';
+      });
+  </script>
+  ` }) %>

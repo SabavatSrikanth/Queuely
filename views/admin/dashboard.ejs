@@ -1,0 +1,224 @@
+<%- include('../layouts/main', { title: 'Super Admin Dashboard - ' + appName, body: ` <h2 class="fw-bold mb-4">Super
+  Admin Dashboard</h2>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 text-center">
+        <div class="card-body">
+          <h6 class="text-muted">Total Users</h6>
+          <h2 class="text-primary fw-bold" id="stat-users">--</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 text-center">
+        <div class="card-body">
+          <h6 class="text-muted">Total Businesses</h6>
+          <h2 class="text-success fw-bold" id="stat-businesses">--</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 text-center">
+        <div class="card-body">
+          <h6 class="text-muted">Verified Businesses</h6>
+          <h2 class="text-info fw-bold" id="stat-verified">--</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0 text-center">
+        <div class="card-body">
+          <h6 class="text-muted">Pending Verification</h6>
+          <h2 class="text-warning fw-bold" id="stat-pending">--</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-6">
+      <div class="card bg-dark text-white border-0 shadow-sm">
+        <div class="card-body d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">Platform Audit Logs</h5>
+            <small class="text-muted">Monitor all critical actions</small>
+          </div>
+          <a href="/admin/audit-log" class="btn btn-light btn-sm fw-bold">View Logs</a>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="card bg-secondary text-white border-0 shadow-sm">
+        <div class="card-body d-flex justify-content-between align-items-center">
+          <div>
+            <h5 class="mb-0">Manage Users</h5>
+            <small class="text-light">Activate or deactivate accounts</small>
+          </div>
+          <button class="btn btn-light btn-sm fw-bold" id="btn-manage-users">Manage</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="businesses-panel" class="mb-4">
+    <h4 class="fw-bold mb-3">All Businesses</h4>
+    <div id="biz-list" class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Category</th>
+            <th>Owner</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="biz-table">
+          <tr>
+            <td colspan="5" class="text-muted text-center">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div id="users-panel" style="display:none;" class="mb-4">
+    <h4 class="fw-bold mb-3">All Users</h4>
+    <div class="table-responsive">
+      <table class="table align-middle">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Role</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="user-table">
+          <tr>
+            <td colspan="5" class="text-muted text-center">Loading...</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  `, script: `
+  <script>
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      const d = document.createElement('div'); d.textContent = String(str); return d.innerHTML;
+    }
+
+    function toggleUsersPanel() {
+      const p = document.getElementById('users-panel');
+      p.style.display = p.style.display === 'none' ? 'block' : 'none';
+      if (p.style.display === 'block') loadUsers();
+    }
+
+    async function loadStats() {
+      const [uRes, bRes] = await Promise.all([
+        fetch('/api/admin/users?limit=1'),
+        fetch('/api/admin/businesses?limit=1'),
+      ]);
+      const [u, b] = await Promise.all([uRes.json(), bRes.json()]);
+      if (u.success && u.pagination) document.getElementById('stat-users').innerText = u.pagination.total;
+      if (b.success && b.pagination) {
+        document.getElementById('stat-businesses').innerText = b.pagination.total;
+      }
+      const verRes = await fetch('/api/admin/businesses?isVerified=true&limit=1');
+      const ver = await verRes.json();
+      if (ver.success && ver.pagination) {
+        document.getElementById('stat-verified').innerText = ver.pagination.total;
+        document.getElementById('stat-pending').innerText = (b.pagination ? b.pagination.total : 0) - ver.pagination.total;
+      }
+    }
+
+    async function verifyBiz(id) {
+      await fetch('/api/admin/businesses/' + id + '/verify', { method: 'PUT' });
+      loadBusinesses(); loadStats();
+    }
+
+    async function suspendBiz(id) {
+      if (confirm('Suspend this business?')) {
+        await fetch('/api/admin/businesses/' + id + '/suspend', { method: 'PUT' });
+        loadBusinesses(); loadStats();
+      }
+    }
+    async function unsuspendBiz(id) {
+      await fetch('/api/admin/businesses/' + id + '/unsuspend', { method: 'PUT' });
+      loadBusinesses(); loadStats();
+    }
+    async function toggleUser(id) {
+      await fetch('/api/admin/users/' + id + '/status', { method: 'PUT' });
+      await loadUsers();
+      loadStats();
+    }
+
+    async function loadBusinesses() {
+      const res = await fetch('/api/admin/businesses?limit=50');
+      const data = await res.json();
+      const tbody = document.getElementById('biz-table');
+      if (!data.success || !data.data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No businesses found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.data.map(function (b) {
+        const verifyBtn = !b.isVerified ? '<button class="btn btn-sm btn-outline-success me-1" data-verify-id="' + b._id + '">Verify</button>' : '';
+        const suspendBtn = b.isActive ? '<button class="btn btn-sm btn-outline-danger" data-suspend-id="' + b._id + '">Suspend</button>' : '<button class="btn btn-sm btn-outline-success" data-unsuspend-id="' + b._id + '">Unsuspend</button>';
+        return '<tr>' +
+          '<td class="fw-bold">' + esc(b.name) + '</td>' +
+          '<td>' + esc(b.category) + '</td>' +
+          '<td>' + esc(b.owner) + '</td>' +
+          '<td>' +
+          '<span class="badge ' + (b.isVerified ? 'bg-success' : 'bg-warning text-dark') + '">' + (b.isVerified ? 'Verified' : 'Unverified') + '</span>' +
+          '<span class="badge ' + (b.isActive ? 'bg-primary' : 'bg-secondary') + ' ms-1">' + (b.isActive ? 'Active' : 'Suspended') + '</span>' +
+          '</td>' +
+          '<td>' + verifyBtn + suspendBtn + '</td>' +
+          '</tr>';
+      }).join('');
+
+      document.querySelectorAll('[data-verify-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { verifyBiz(this.getAttribute('data-verify-id')); });
+      });
+      document.querySelectorAll('[data-suspend-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { suspendBiz(this.getAttribute('data-suspend-id')); });
+      });
+      document.querySelectorAll('[data-unsuspend-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { unsuspendBiz(this.getAttribute('data-unsuspend-id')); });
+      });
+    }
+
+    async function loadUsers() {
+      const res = await fetch('/api/admin/users?limit=50');
+      const data = await res.json();
+      const tbody = document.getElementById('user-table');
+      if (!data.success || !data.data.length) {
+        tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted">No users found.</td></tr>';
+        return;
+      }
+      tbody.innerHTML = data.data.map(function (u) {
+        return '<tr>' +
+          '<td>' + esc(u.name) + '</td>' +
+          '<td>' + esc(u.email) + '</td>' +
+          '<td><span class="badge bg-secondary">' + esc(u.role) + '</span></td>' +
+          '<td><span class="badge ' + (u.isActive ? 'bg-success' : 'bg-danger') + '">' + (u.isActive ? 'Active' : 'Inactive') + '</span></td>' +
+          '<td><button class="btn btn-sm btn-outline-' + (u.isActive ? 'danger' : 'success') + '" data-toggle-user="' + u._id + '">' + (u.isActive ? 'Deactivate' : 'Activate') + '</button></td>' +
+          '</tr>';
+      }).join('');
+
+      document.querySelectorAll('[data-toggle-user]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          var id = this.getAttribute('data-toggle-user');
+          fetch('/api/admin/users/' + id + '/status', { method: 'PUT' })
+            .then(function () { loadUsers(); loadStats(); });
+        });
+      });
+    }
+    document.getElementById('btn-manage-users').addEventListener('click', toggleUsersPanel);
+
+    loadStats();
+    loadBusinesses();
+  </script>
+  ` }) %>

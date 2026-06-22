@@ -1,0 +1,108 @@
+<%- include('../layouts/main', { title: 'Settings - ' + appName, body: `
+  <h2 class="fw-bold mb-4">Business Settings</h2>
+  <div id="settings-error" class="alert alert-danger d-none"></div>
+  <div id="settings-success" class="alert alert-success d-none"></div>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">Business Profile</h5>
+      <div class="row g-3">
+        <div class="col-md-6">
+          <label class="form-label">Business Name</label>
+          <input type="text" id="biz-name" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Category</label>
+          <select id="biz-category" class="form-select">
+            <option value="healthcare">Healthcare</option>
+            <option value="salon_beauty">Salon & Beauty</option>
+            <option value="banking">Banking</option>
+            <option value="government">Government</option>
+            <option value="education">Education</option>
+            <option value="retail">Retail</option>
+            <option value="legal">Legal</option>
+            <option value="fitness">Fitness</option>
+            <option value="food_beverage">Food & Beverage</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        <div class="col-12">
+          <label class="form-label">Description</label>
+          <textarea id="biz-desc" class="form-control" rows="3"></textarea>
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Contact Phone</label>
+          <input type="text" id="biz-phone" class="form-control">
+        </div>
+        <div class="col-md-6">
+          <label class="form-label">Contact Email</label>
+          <input type="email" id="biz-email" class="form-control">
+        </div>
+      </div>
+      <button class="btn btn-primary mt-3" id="btn-save-settings">Save Changes</button>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">Account</h5>
+      <a href="/logout" class="btn btn-outline-secondary">Log Out</a>
+    </div>
+  </div>
+`, script: `
+  <script>
+    let businessId = null;
+
+    async function init() {
+      const meRes = await fetch('/api/auth/me');
+      const me = await meRes.json();
+      if (!me.success || !me.data.businessId) return;
+      businessId = me.data.businessId;
+
+      const bizRes = await fetch('/api/businesses/' + businessId);
+      const biz = await bizRes.json();
+      if (!biz.success) return;
+
+      document.getElementById('biz-name').value = biz.data.name || '';
+      document.getElementById('biz-category').value = biz.data.category || 'other';
+      document.getElementById('biz-desc').value = biz.data.description || '';
+      document.getElementById('biz-phone').value = (biz.data.contact && biz.data.contact.phone) || '';
+      document.getElementById('biz-email').value = (biz.data.contact && biz.data.contact.email) || '';
+    }
+
+    async function saveSettings() {
+      const errBox = document.getElementById('settings-error');
+      const sucBox = document.getElementById('settings-success');
+      errBox.classList.add('d-none');
+      sucBox.classList.add('d-none');
+
+      const res = await fetch('/api/businesses/' + businessId, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: document.getElementById('biz-name').value.trim(),
+          category: document.getElementById('biz-category').value,
+          description: document.getElementById('biz-desc').value.trim(),
+          contact: {
+            phone: document.getElementById('biz-phone').value.trim(),
+            email: document.getElementById('biz-email').value.trim(),
+          }
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        sucBox.textContent = 'Settings saved successfully.';
+        sucBox.classList.remove('d-none');
+        showToast('Settings saved!', 'success');
+      } else {
+        errBox.textContent = data.error || data.message || 'Save failed.';
+        errBox.classList.remove('d-none');
+        showToast(data.error || data.message || 'Save failed.', 'error');
+      }
+    }
+
+    document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+
+    init();
+  </script>
+` }) %>

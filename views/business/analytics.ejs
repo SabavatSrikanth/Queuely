@@ -1,0 +1,133 @@
+<%- include('../layouts/main', { title: 'Analytics - ' + appName, body: `
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h2 class="fw-bold m-0">Analytics & Insights</h2>
+    <select id="range-select" class="form-select" style="width: auto;" onchange="loadAnalytics()">
+      <option value="7d">Last 7 days</option>
+      <option value="30d" selected>Last 30 days</option>
+      <option value="90d">Last 90 days</option>
+    </select>
+  </div>
+
+  <div class="row g-4 mb-4">
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="text-muted text-uppercase fw-bold mb-2">Total Served</h6>
+          <h2 class="m-0 text-primary" id="stat-served">0</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="text-muted text-uppercase fw-bold mb-2">Joined Queue</h6>
+          <h2 class="m-0 text-info" id="stat-joined">0</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="text-muted text-uppercase fw-bold mb-2">No-Show Rate</h6>
+          <h2 class="m-0 text-danger" id="stat-noshow">0%</h2>
+        </div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card shadow-sm border-0">
+        <div class="card-body">
+          <h6 class="text-muted text-uppercase fw-bold mb-2">Appointments Booked</h6>
+          <h2 class="m-0 text-success" id="stat-appts">0</h2>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0 mb-4">
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">Activity Breakdown</h5>
+      <div id="breakdown-table" class="table-responsive">
+        <table class="table">
+          <thead><tr><th>Event</th><th>Count</th><th>Avg Wait (min)</th><th>Avg Serve Time (min)</th></tr></thead>
+          <tbody id="breakdown-body"><tr><td colspan="4" class="text-center text-muted">Loading...</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body">
+      <h5 class="fw-bold mb-3">Busiest Hours (last 30 days, joins per hour)</h5>
+      <div id="heatmap-container" class="text-muted">Loading heatmap...</div>
+    </div>
+  </div>
+`, script: `
+  <script>
+    let businessId = null;
+    const eventLabels = {
+      join: 'Joined Queue', serve: 'Served', skip: 'Skipped', cancel: 'Cancelled',
+      no_show: 'No Show', appointment_book: 'Appointments Booked',
+      appointment_complete: 'Appointments Completed', appointment_cancel: 'Appointments Cancelled',
+    };
+
+    async function init() {
+      const meRes = await fetch('/api/auth/me');
+      const me = await meRes.json();
+      if (!me.success || !me.data.businessId) {
+        document.getElementById('breakdown-body').innerHTML = '<tr><td colspan="4" class="text-center text-muted">Create a business on the Dashboard first.</td></tr>';
+        return;
+      }
+      businessId = me.data.businessId;
+      loadAnalytics();
+      loadHeatmap();
+    }
+
+    async function loadAnalytics() {
+      const range = document.getElementById('range-select').value;
+      const res = await fetch('/api/analytics/business/' + businessId + '?range=' + range);
+      const data = await res.json();
+      if (!data.success) return;
+
+      const s = data.data.summary;
+      document.getElementById('stat-served').innerText = s.totalServed;
+      document.getElementById('stat-joined').innerText = s.totalJoined;
+      document.getElementById('stat-noshow').innerText = s.noShowRatePercent + '%';
+      document.getElementById('stat-appts').innerText = s.appointmentsBooked;
+
+      const body = document.getElementById('breakdown-body');
+      if (data.data.byEventType.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" class="text-center text-muted">No activity recorded yet for this period.</td></tr>';
+        return;
+      }
+      body.innerHTML = data.data.byEventType.map(e => \`
+        <tr>
+          <td>\${eventLabels[e._id] || e._id}</td>
+          <td>\${e.count}</td>
+          <td>\${e.avgWaitTime ? Math.round(e.avgWaitTime) : '--'}</td>
+          <td>\${e.avgServeTime ? Math.round(e.avgServeTime) : '--'}</td>
+        </tr>
+      \`).join('');
+    }
+
+    async function loadHeatmap() {
+      const res = await fetch('/api/analytics/business/' + businessId + '/heatmap');
+      const data = await res.json();
+      const container = document.getElementById('heatmap-container');
+      if (!data.success || data.data.length === 0) {
+        container.innerHTML = '<p class="text-muted">Not enough data yet to show a heatmap.</p>';
+        return;
+      }
+      const days = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+      const maxCount = Math.max(...data.data.map(d => d.count));
+      container.innerHTML = '<div class="d-flex flex-wrap gap-2">' + data.data.map(d => {
+        const intensity = maxCount ? Math.round((d.count / maxCount) * 100) : 0;
+        return \`<div class="text-center" style="width:70px;">
+          <div style="height:50px; background: rgba(79,70,229,\${0.15 + intensity/150}); border-radius:6px; display:flex; align-items:center; justify-content:center; font-weight:600;">\${d.count}</div>
+          <small class="text-muted">\${days[d._id.day] || ''} \${d._id.hour}:00</small>
+        </div>\`;
+      }).join('') + '</div>';
+    }
+
+    init();
+  </script>
+` }) %>
