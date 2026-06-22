@@ -19,6 +19,14 @@
     <div id="called-ticket" style="font-size: 2rem; font-weight: bold; color: var(--accent);">None</div>
   </div>
 
+  <div id="appointment-suggestion"
+    style="display:none; background:#fff8f0; border:1px solid #f59e0b; border-radius:10px; padding:1rem; margin-bottom:1.5rem;">
+    <p style="margin:0 0 0.5rem; font-weight:600; color:#d97706;">⏳ Long wait ahead!</p>
+    <p style="margin:0 0 0.75rem; font-size:0.9rem; color:#666;">The queue is busy right now. Would you prefer to book a
+      specific time slot instead?</p>
+    <a id="book-appointment-link" href="#" class="btn btn-warning btn-sm fw-bold">📅 Book an Appointment Instead</a>
+  </div>
+
   <div id="join-form">
     <div class="mb-2">
       <input type="text" id="guest-name" class="form-control" placeholder="Your name" required>
@@ -73,9 +81,20 @@
       document.getElementById('queue-size').innerText = snapshot.waitingCount ?? snapshot.currentQueueCount ?? '--';
       document.getElementById('called-ticket').innerText = (snapshot.nowServing && snapshot.nowServing.ticketNumber) || 'None';
       document.getElementById('service-name').innerText = snapshot.serviceName || ('Service ' + serviceId.substring(0, 6));
+
       if (snapshot.isAcceptingQueue === false) {
         document.getElementById('join-btn').disabled = true;
         document.getElementById('join-btn').innerText = 'Queue Closed';
+      }
+
+      var estimatedWait = snapshot.estimatedWaitTime || (snapshot.waitingCount * 15);
+      var suggestion = document.getElementById('appointment-suggestion');
+      var bookLink = document.getElementById('book-appointment-link');
+      if (estimatedWait > 20 && snapshot.appointmentEnabled) {
+        bookLink.href = '/my-appointments?book=' + serviceId;
+        suggestion.style.display = 'block';
+      } else {
+        suggestion.style.display = 'none';
       }
     }
 
@@ -103,6 +122,14 @@
       renderSnapshot(snapshot);
     });
 
+    socket.on('ticket:status_update', function (update) {
+      if (update.status === 'called') {
+        showToast('Your ticket has been called! Please proceed to the counter.', 'warning', 6000);
+      } else if (update.status === 'serving') {
+        showToast('You are now being served!', 'success', 5000);
+      }
+    });
+
     async function joinQueue() {
       const name = document.getElementById('guest-name').value.trim();
       const phone = document.getElementById('guest-phone').value.trim();
@@ -112,6 +139,7 @@
       if (!name || !phone) {
         errorBox.textContent = 'Please enter your name and phone number.';
         errorBox.style.display = 'block';
+        showToast('Please enter your name and phone number.', 'error');
         return;
       }
 
@@ -130,10 +158,13 @@
         if (data.success) {
           document.getElementById('join-form').style.display = 'none';
           document.getElementById('join-result').style.display = 'block';
+          document.getElementById('appointment-suggestion').style.display = 'none';
           document.getElementById('my-ticket-number').innerText = data.data.ticketNumber;
           document.getElementById('my-ticket-link').href = '/ticket-status/' + data.data._id;
           document.getElementById('my-position').innerText = data.data.position || '--';
           document.getElementById('my-wait-time').innerText = data.data.predictedWaitTime || '--';
+
+          showToast('You joined the queue! Ticket: ' + data.data.ticketNumber, 'success');
 
           if (data.data.qrCodeUrl) {
             document.getElementById('qr-code-img').src = data.data.qrCodeUrl;
@@ -148,12 +179,14 @@
         } else {
           errorBox.textContent = data.error || data.message || 'Could not join the queue.';
           errorBox.style.display = 'block';
+          showToast(data.error || data.message || 'Could not join the queue.', 'error');
           btn.disabled = false;
           btn.innerText = 'Join Queue Now';
         }
       } catch (err) {
         errorBox.textContent = 'Failed to join queue. Please try again.';
         errorBox.style.display = 'block';
+        showToast('Failed to join queue. Please try again.', 'error');
         btn.disabled = false;
         btn.innerText = 'Join Queue Now';
       }
@@ -165,6 +198,7 @@
       const link = this.getAttribute('data-link') || window.location.href;
       navigator.clipboard.writeText(link).then(function () {
         document.getElementById('copy-success').style.display = 'block';
+        showToast('Ticket link copied!', 'info');
         setTimeout(function () {
           document.getElementById('copy-success').style.display = 'none';
         }, 3000);

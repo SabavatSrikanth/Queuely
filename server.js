@@ -3,22 +3,18 @@ const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/db');
 const { initSocket } = require('./config/socket');
+const { startReminderJob } = require('./services/reminder.service');
 
 const PORT = process.env.PORT || 3000;
 
-// ─── Start Server ─────────────────────────────────────────────────────────────
 const startServer = async () => {
   try {
-    // Connect to MongoDB
     await connectDB();
 
-    // Create HTTP server
     const server = http.createServer(app);
 
-    // Initialize Socket.io
     initSocket(server);
 
-    // Listen
     server.listen(PORT, () => {
       console.log(`\n╔══════════════════════════════════════════╗`);
       console.log(`║         QUEUELY v2.0 IS RUNNING          ║`);
@@ -26,9 +22,10 @@ const startServer = async () => {
       console.log(`║  Server  : http://localhost:${PORT}           ║`);
       console.log(`║  ENV     : ${(process.env.NODE_ENV || 'development').padEnd(30)} ║`);
       console.log(`╚══════════════════════════════════════════╝\n`);
+
+      startReminderJob();
     });
 
-    // ─── Graceful Shutdown ──────────────────────────────────────────────────
     const shutdown = (signal) => {
       console.log(`\n[${signal}] Graceful shutdown initiated...`);
       server.close(() => {
@@ -50,7 +47,6 @@ const startServer = async () => {
   }
 };
 
-// ─── Unhandled Rejections ─────────────────────────────────────────────────────
 process.on('unhandledRejection', (reason, promise) => {
   console.error('[UnhandledRejection]', reason);
 });

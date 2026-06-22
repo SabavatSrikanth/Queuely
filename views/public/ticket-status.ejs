@@ -1,77 +1,165 @@
-<%- include('../layouts/main', { title: 'Ticket Status', body: `
-  <div class="card" style="max-width: 600px; margin: 0 auto; text-align: center;">
-    <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2rem;">
-      <div class="status-indicator" id="conn-status"></div>
-      <span id="conn-text" style="color: var(--text-muted); font-size: 0.875rem;">Connecting...</span>
-    </div>
+<%- include('../layouts/main', { title: 'Ticket Status' , body: ` <div class="card"
+  style="max-width: 600px; margin: 0 auto; text-align: center;">
+  <div style="display: flex; align-items: center; justify-content: center; margin-bottom: 2rem;">
+    <div class="status-indicator" id="conn-status"></div>
+    <span id="conn-text" style="color: var(--text-muted); font-size: 0.875rem;">Connecting...</span>
+  </div>
 
-    <h1>Ticket Status</h1>
-    
-    <div style="margin: 2rem 0; padding: 2rem; background: var(--bg); border-radius: 12px; border: 1px solid var(--border);">
-      <h2 style="font-size: 3rem; color: var(--text); margin: 0;" id="ticket-number">Loading...</h2>
-      <div style="display: inline-block; padding: 0.25rem 1rem; background: rgba(59, 130, 246, 0.2); color: var(--primary); border-radius: 99px; font-weight: 600; margin-top: 1rem; text-transform: uppercase;" id="ticket-status">
-        --
-      </div>
-    </div>
+  <h1>Ticket Status</h1>
 
-    <div style="display: flex; justify-content: space-around; margin: 2rem 0; text-align: left;">
-      <div>
-        <p style="margin:0; font-size: 0.875rem;">Position in Queue</p>
-        <h3 style="font-size: 2rem; margin:0;" id="ticket-position">--</h3>
-      </div>
-      <div>
-        <p style="margin:0; font-size: 0.875rem;">Est. Wait Time</p>
-        <h3 style="font-size: 2rem; margin:0;"><span id="ticket-wait">--</span> min</h3>
-      </div>
+  <div
+    style="margin: 2rem 0; padding: 2rem; background: var(--bg); border-radius: 12px; border: 1px solid var(--border);">
+    <h2 style="font-size: 3rem; color: var(--text); margin: 0;" id="ticket-number">Loading...</h2>
+    <div
+      style="display: inline-block; padding: 0.25rem 1rem; background: rgba(59, 130, 246, 0.2); color: var(--primary); border-radius: 99px; font-weight: 600; margin-top: 1rem; text-transform: uppercase;"
+      id="ticket-status">
+      --
     </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-around; margin: 2rem 0; text-align: left;">
+    <div>
+      <p style="margin:0; font-size: 0.875rem;">Position in Queue</p>
+      <h3 style="font-size: 2rem; margin:0;" id="ticket-position">--</h3>
+    </div>
+    <div>
+      <p style="margin:0; font-size: 0.875rem;">Est. Wait Time</p>
+      <h3 style="font-size: 2rem; margin:0;"><span id="ticket-wait">--</span> min</h3>
+    </div>
+  </div>
+
+  <div id="review-section"
+    style="display:none; margin-top:2rem; padding:1.5rem; background: var(--bg); border-radius:12px; border:1px solid var(--border); text-align:left;">
+    <h4 style="margin-bottom:0.5rem;">How was your experience?</h4>
+    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:1rem;">Rate your visit and help others know what
+      to expect.</p>
+    <div id="star-rating" style="font-size:2.5rem; cursor:pointer; margin-bottom:1rem;">
+      <span data-star="1">☆</span>
+      <span data-star="2">☆</span>
+      <span data-star="3">☆</span>
+      <span data-star="4">☆</span>
+      <span data-star="5">☆</span>
+    </div>
+    <textarea id="review-comment" class="form-control mb-3" placeholder="Leave a comment (optional)"
+      rows="3"></textarea>
+    <button class="btn btn-primary w-100" id="btn-submit-review">Submit Review</button>
+    <div id="review-success" style="display:none; color:var(--accent); margin-top:1rem; font-weight:600;">
+      ✓ Thanks for your review!
+    </div>
+    <div id="review-error" style="display:none; color:#ef4444; margin-top:1rem;"></div>
+  </div>
 
   </div>
-`, script: `
+  `, script: `
   <script>
     const ticketId = '${ticketId}';
-    
-    // Initial fetch
+    let selectedRating = 0;
+    let businessId = null;
+
     fetch('/api/queue/ticket/' + ticketId)
-      .then(res => res.json())
-      .then(data => {
-        if(data.success) {
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
+        if (data.success) {
           document.getElementById('ticket-number').innerText = data.data.ticketNumber;
           document.getElementById('ticket-status').innerText = data.data.status;
           document.getElementById('ticket-position').innerText = data.data.position;
           document.getElementById('ticket-wait').innerText = data.data.predictedWaitTime || '--';
+          businessId = data.data.business;
+          if (data.data.status === 'served') {
+            document.getElementById('review-section').style.display = 'block';
+          }
         }
       });
 
-    // Socket Setup
     const socket = io();
     const statusInd = document.getElementById('conn-status');
     const statusTxt = document.getElementById('conn-text');
 
-    socket.on('connect', () => {
+    socket.on('connect', function () {
       statusInd.classList.add('connected');
       statusTxt.innerText = 'Live Updates Active';
-      socket.emit('join:ticket_room', { ticketId });
+      socket.emit('join:ticket_room', { ticketId: ticketId });
     });
 
-    socket.on('disconnect', () => {
+    socket.on('disconnect', function () {
       statusInd.classList.remove('connected');
       statusTxt.innerText = 'Disconnected - Reconnecting...';
     });
 
-    socket.on('ticket:position', (data) => {
+    socket.on('ticket:position', function (data) {
       document.getElementById('ticket-position').innerText = data.position;
       document.getElementById('ticket-wait').innerText = data.estimatedWait || '--';
     });
 
-    socket.on('ticket:status', (data) => {
+    socket.on('ticket:status', function (data) {
       document.getElementById('ticket-status').innerText = data.status;
     });
 
-    socket.on('ticket:called', (data) => {
+    socket.on('ticket:called', function (data) {
       document.getElementById('ticket-status').innerText = 'CALLED';
       document.getElementById('ticket-status').style.background = 'rgba(16, 185, 129, 0.2)';
       document.getElementById('ticket-status').style.color = 'var(--accent)';
-      alert('Your ticket ' + data.ticketNumber + ' has been called! Please proceed.');
+      showToast('Your ticket ' + data.ticketNumber + ' has been called! Please proceed.', 'warning', 6000);
+    });
+
+    socket.on('ticket:status_update', function (data) {
+      document.getElementById('ticket-status').innerText = data.status.toUpperCase();
+      if (data.status === 'served') {
+        document.getElementById('review-section').style.display = 'block';
+        showToast('You have been served! Please leave a review.', 'success');
+      }
+    });
+
+    document.querySelectorAll('[data-star]').forEach(function (star) {
+      star.addEventListener('mouseover', function () {
+        var val = parseInt(this.getAttribute('data-star'));
+        document.querySelectorAll('[data-star]').forEach(function (s) {
+          s.innerText = parseInt(s.getAttribute('data-star')) <= val ? '★' : '☆';
+        });
+      });
+      star.addEventListener('click', function () {
+        selectedRating = parseInt(this.getAttribute('data-star'));
+        document.querySelectorAll('[data-star]').forEach(function (s) {
+          s.innerText = parseInt(s.getAttribute('data-star')) <= selectedRating ? '★' : '☆';
+          s.style.color = parseInt(s.getAttribute('data-star')) <= selectedRating ? '#f59e0b' : '#aaa';
+        });
+      });
+    });
+
+    document.getElementById('star-rating').addEventListener('mouseleave', function () {
+      document.querySelectorAll('[data-star]').forEach(function (s) {
+        s.innerText = parseInt(s.getAttribute('data-star')) <= selectedRating ? '★' : '☆';
+        s.style.color = parseInt(s.getAttribute('data-star')) <= selectedRating ? '#f59e0b' : '#aaa';
+      });
+    });
+
+    document.getElementById('btn-submit-review').addEventListener('click', async function () {
+      if (!selectedRating) {
+        showToast('Please select a star rating.', 'error');
+        return;
+      }
+      try {
+        const res = await fetch('/api/reviews/ticket/' + ticketId, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({
+            rating: selectedRating,
+            comment: document.getElementById('review-comment').value.trim(),
+            business: businessId
+          })
+        });
+        const data = await res.json();
+        if (data.success) {
+          document.getElementById('review-success').style.display = 'block';
+          document.getElementById('btn-submit-review').style.display = 'none';
+          showToast('Thank you for your review!', 'success');
+        } else {
+          showToast(data.error || data.message || 'Could not submit review.', 'error');
+        }
+      } catch (err) {
+        showToast('Failed to submit review.', 'error');
+      }
     });
   </script>
-` }) %>
+  ` }) %>

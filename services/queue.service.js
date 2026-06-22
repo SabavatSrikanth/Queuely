@@ -41,10 +41,12 @@ const buildQueueSnapshot = async (serviceId) => {
 
   const waitingCount = await Ticket.countDocuments({ service: serviceId, status: 'waiting' });
 
-  return {
+return {
     serviceId: service._id,
     serviceName: service.name,
     isAcceptingQueue: service.isAcceptingQueue,
+    appointmentEnabled: service.appointmentEnabled,
+    estimatedWaitTime: waitingCount * (service.estimatedServiceTime || 15),
     currentQueueCount: service.currentQueueCount,
     waitingCount,
     nowServing: calling ? { ticketId: calling._id, ticketNumber: calling.ticketNumber, status: calling.status } : null,
