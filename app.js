@@ -153,6 +153,9 @@ app.use(attachUser);
 // Public queue page — no auth required
 app.get('/q/:businessSlug/:serviceId', async (req, res, next) => {
   try {
+    if (!res.locals.user) {
+      return res.redirect('/login?redirect=' + encodeURIComponent(req.originalUrl));
+    }
     res.render('public/live-queue', {
       businessSlug: escapeJsString(req.params.businessSlug),
       serviceId: escapeJsString(req.params.serviceId),
@@ -174,7 +177,7 @@ app.get('/ticket-status/:ticketId', async (req, res, next) => {
 });
 // Back-compat alias for the older /ticket/:id path
 app.get('/ticket/:ticketId', (req, res) => res.redirect(301, `/ticket-status/${encodeURIComponent(req.params.ticketId)}`));
-
+app.get('/notifications', requirePageAuth('customer'), (req, res) => res.render('customer/notifications', { appName: APP_NAME, user: res.locals.user }));
 // Auth pages — redirect already-logged-in users away from these
 app.get('/login', (req, res) => {
   if (res.locals.user) return res.redirect('/dashboard');

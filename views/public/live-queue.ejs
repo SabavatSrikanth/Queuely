@@ -28,13 +28,24 @@
   </div>
 
   <div id="join-form">
-    <div class="mb-2">
-      <input type="text" id="guest-name" class="form-control" placeholder="Your name" required>
+    <div id="guest-form-fields" style="display:none;">
+      <div class="mb-2">
+        <input type="text" id="guest-name" class="form-control" placeholder="Your name" required>
+      </div>
+      <div class="mb-3">
+        <input type="tel" id="guest-phone" class="form-control" placeholder="Your phone number" required>
+      </div>
+      <button class="btn btn-primary" style="width: 100%;" id="join-btn">Join Queue Now</button>
     </div>
-    <div class="mb-3">
-      <input type="tel" id="guest-phone" class="form-control" placeholder="Your phone number" required>
+    <div id="login-prompt"
+      style="display:none; padding:1.5rem; background:#f8f7ff; border-radius:12px; border:1px solid #4f46e5;">
+      <p style="margin-bottom:1rem; font-weight:600; color:#4f46e5;">🔒 Login required to join the queue</p>
+      <p style="font-size:0.875rem; color:#666; margin-bottom:1rem;">Please login or create an account to join this
+        queue and track your ticket in real time.</p>
+      <a href="/login?redirect=/q/${businessSlug}/${serviceId}" class="btn btn-primary w-100 mb-2">Login to Join
+        Queue</a>
+      <a href="/register" class="btn btn-outline-primary w-100">Create an Account</a>
     </div>
-    <button class="btn btn-primary" style="width: 100%;" id="join-btn">Join Queue Now</button>
     <div id="join-error" class="text-danger mt-2" style="display:none; font-size: 0.875rem;"></div>
   </div>
 
@@ -102,6 +113,30 @@
       .then(function (res) { return res.json(); })
       .then(function (data) { if (data.success) renderSnapshot(data.data); })
       .catch(function () { });
+
+ function checkAuth() {
+  fetch('/api/auth/me', { credentials: 'include' })
+    .then(function(res) { return res.json(); })
+    .then(function(data) {
+      if (!data.success) {
+        document.getElementById('guest-form-fields').style.display = 'none';
+        document.getElementById('login-prompt').style.display = 'block';
+        document.getElementById('join-btn') && (document.getElementById('join-btn').style.display = 'none');
+      } else {
+        document.getElementById('guest-form-fields').style.display = 'block';
+        document.getElementById('login-prompt').style.display = 'none';
+      }
+    })
+    .catch(function() {
+      document.getElementById('guest-form-fields').style.display = 'none';
+      document.getElementById('login-prompt').style.display = 'block';
+    });
+}
+
+checkAuth();
+
+window.addEventListener('focus', checkAuth);
+window.addEventListener('pageshow', checkAuth);
 
     const socket = io();
     const statusInd = document.getElementById('conn-status');

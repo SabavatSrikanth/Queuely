@@ -1,14 +1,35 @@
-<%- include('../layouts/main', { title: 'Business Profile - ' + appName, user: typeof user !== 'undefined' ? user : null, body: `
-  <div class="mb-4">
-    <a href="/" class="text-decoration-none"><i class="bi bi-arrow-left"></i> Back to Home</a>
+<%- include('../layouts/main', { title: 'Business Profile - ' + appName, user: typeof user !=='undefined' ? user : null,
+  body: ` <div class="mb-4">
+  <a href="/" class="text-decoration-none"><i class="bi bi-arrow-left"></i> Back to Home</a>
   </div>
+
   <div class="card shadow-sm border-0 mb-4">
-    <div class="card-body p-5 text-center">
-      <h2 class="fw-bold mb-2" id="biz-name">Loading...</h2>
-      <p class="text-muted lead" id="biz-desc"></p>
-      <div class="d-flex justify-content-center gap-3 mt-4">
-        <span class="badge bg-primary px-3 py-2" id="biz-cat"></span>
-        <span class="badge bg-success px-3 py-2"><i class="bi bi-star-fill"></i> <span id="biz-rating"></span></span>
+    <div class="card-body p-5">
+      <div class="row align-items-center">
+        <div class="col-md-8">
+          <h2 class="fw-bold mb-2" id="biz-name">Loading...</h2>
+          <p class="text-muted lead mb-3" id="biz-desc"></p>
+          <div class="d-flex flex-wrap gap-2 mb-3">
+            <span class="badge bg-primary px-3 py-2" id="biz-cat"></span>
+            <span class="badge bg-warning text-dark px-3 py-2"><i class="bi bi-star-fill"></i> <span
+                id="biz-rating"></span></span>
+            <span class="badge bg-success px-3 py-2" id="biz-served"></span>
+          </div>
+          <div class="d-flex flex-wrap gap-4" id="biz-contact-row">
+            <span id="biz-phone-wrap" style="display:none;"><i class="bi bi-telephone"></i> <span
+                id="biz-phone"></span></span>
+            <span id="biz-email-wrap" style="display:none;"><i class="bi bi-envelope"></i> <span
+                id="biz-email"></span></span>
+            <span id="biz-address-wrap" style="display:none;"><i class="bi bi-geo-alt"></i> <span
+                id="biz-address"></span></span>
+          </div>
+        </div>
+        <div class="col-md-4 text-md-end text-center mt-3 mt-md-0">
+          <div id="biz-logo-wrap" style="display:none;">
+            <img id="biz-logo" src="" alt="Business Logo"
+              style="width:100px; height:100px; object-fit:cover; border-radius:12px; border:1px solid #eee;">
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -17,16 +38,11 @@
   <div class="row g-4" id="service-list">
     <div class="col-12 text-muted">Loading services...</div>
   </div>
-`, script: `
+  `, script: `
   <script>
     const slug = '${slug}';
     let businessId = null;
 
-    // Escapes dynamic, business/owner-controlled text (service & business
-    // name/description) before it's inserted via innerHTML, since those
-    // fields are set by business owners and rendered for every visitor —
-    // without escaping, a malicious owner could store an XSS payload in a
-    // service name/description that executes in every customer's browser.
     function esc(str) {
       if (str === null || str === undefined) return '';
       const div = document.createElement('div');
@@ -35,8 +51,8 @@
     }
 
     fetch('/api/businesses/slug/' + encodeURIComponent(slug))
-      .then(res => res.json())
-      .then(data => {
+      .then(function (res) { return res.json(); })
+      .then(function (data) {
         if (!data.success || !data.data) {
           document.getElementById('biz-name').innerText = 'Business not found';
           document.getElementById('service-list').innerHTML = '';
@@ -44,41 +60,63 @@
         }
         const biz = data.data;
         businessId = biz._id;
+
         document.getElementById('biz-name').innerText = biz.name;
         document.getElementById('biz-desc').innerText = biz.description || 'No description available.';
         document.getElementById('biz-cat').innerText = biz.category || '';
         document.getElementById('biz-rating').innerText = (biz.averageRating || 0).toFixed(1) + ' (' + (biz.totalReviews || 0) + ' reviews)';
 
-        return fetch('/api/services?business=' + biz._id).then(r => r.json());
+        if (biz.totalServed > 0) {
+          document.getElementById('biz-served').innerText = biz.totalServed + ' customers served';
+          document.getElementById('biz-served').style.display = 'inline-block';
+        }
+
+        if (biz.contact && biz.contact.phone) {
+          document.getElementById('biz-phone').innerText = biz.contact.phone;
+          document.getElementById('biz-phone-wrap').style.display = 'inline-block';
+        }
+        if (biz.contact && biz.contact.email) {
+          document.getElementById('biz-email').innerText = biz.contact.email;
+          document.getElementById('biz-email-wrap').style.display = 'inline-block';
+        }
+        if (biz.address && biz.address.city) {
+          document.getElementById('biz-address').innerText = [biz.address.street, biz.address.city, biz.address.country].filter(Boolean).join(', ');
+          document.getElementById('biz-address-wrap').style.display = 'inline-block';
+        }
+        if (biz.logo) {
+          document.getElementById('biz-logo').src = biz.logo;
+          document.getElementById('biz-logo-wrap').style.display = 'block';
+        }
+
+        return fetch('/api/services?business=' + biz._id).then(function (r) { return r.json(); });
       })
-      .then(data => {
+      .then(function (data) {
         const list = document.getElementById('service-list');
         if (!data) return;
         if (!data.success || !data.data || data.data.length === 0) {
           list.innerHTML = '<div class="col-12"><p class="text-muted">No services found.</p></div>';
           return;
         }
-        list.innerHTML = data.data.map(s => \`
-          <div class="col-md-6">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body">
-                <h5 class="fw-bold">\${esc(s.name)}</h5>
-                <p class="text-muted mb-3">\${esc(s.description || '')}</p>
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <span class="badge bg-light text-dark border">Est. Duration: \${esc(s.estimatedServiceTime)}m</span>
-                  <span class="badge \${s.isAcceptingQueue ? 'bg-success' : 'bg-danger'}">\${s.isAcceptingQueue ? 'Live Queue Open' : 'Queue Closed'}</span>
-                </div>
-                <div class="d-flex gap-2">
-                  \${s.isAcceptingQueue && s.walkinEnabled ? \`<a href="/q/\${encodeURIComponent(slug)}/\${s._id}" class="btn btn-primary flex-grow-1">View Live Queue</a>\` : ''}
-                  \${s.appointmentEnabled ? \`<a href="/my-appointments?book=\${s._id}" class="btn btn-outline-primary flex-grow-1">Book Appointment</a>\` : ''}
-                </div>
-              </div>
-            </div>
-          </div>
-        \`).join('');
+        list.innerHTML = data.data.map(function (s) {
+          const queueBtn = s.isAcceptingQueue && s.walkinEnabled ? '<a href="/q/' + encodeURIComponent(slug) + '/' + s._id + '" class="btn btn-primary flex-grow-1">View Live Queue</a>' : '';
+          const apptBtn = s.appointmentEnabled ? '<a href="/my-appointments?book=' + s._id + '" class="btn btn-outline-primary flex-grow-1">Book Appointment</a>' : '';
+          return '<div class="col-md-6">' +
+            '<div class="card shadow-sm border-0 h-100">' +
+            '<div class="card-body">' +
+            '<h5 class="fw-bold">' + esc(s.name) + '</h5>' +
+            '<p class="text-muted mb-3">' + esc(s.description || '') + '</p>' +
+            '<div class="d-flex justify-content-between align-items-center mb-3">' +
+            '<span class="badge bg-light text-dark border">Est. Duration: ' + esc(s.estimatedServiceTime) + 'm</span>' +
+            '<span class="badge ' + (s.isAcceptingQueue ? 'bg-success' : 'bg-danger') + '">' + (s.isAcceptingQueue ? 'Live Queue Open' : 'Queue Closed') + '</span>' +
+            '</div>' +
+            '<div class="d-flex gap-2">' + queueBtn + apptBtn + '</div>' +
+            '</div>' +
+            '</div>' +
+            '</div>';
+        }).join('');
       })
-      .catch(() => {
+      .catch(function () {
         document.getElementById('biz-name').innerText = 'Something went wrong loading this page.';
       });
   </script>
-` }) %>
+  ` }) %>

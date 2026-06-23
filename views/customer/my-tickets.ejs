@@ -1,9 +1,8 @@
-<%- include('../layouts/main', { title: 'My Tickets - ' + appName, body: `
-  <h2 class="fw-bold mb-4">My Tickets</h2>
+<%- include('../layouts/main', { title: 'My Tickets - ' + appName, body: ` <h2 class="fw-bold mb-4">My Tickets</h2>
   <div class="row" id="ticket-list">
     <div class="col-12 text-muted">Loading tickets...</div>
   </div>
-`, script: `
+  `, script: `
   <script>
     function esc(str) {
       if (str === null || str === undefined) return '';
@@ -12,33 +11,71 @@
       return div.innerHTML;
     }
 
-    fetch('/api/queue/my-tickets')
-      .then(res => {
-        if (res.status === 401) { window.location.href = '/login'; return null; }
-        return res.json();
-      })
-      .then(data => {
-        if (!data || !data.success) return;
-        const list = document.getElementById('ticket-list');
-        if (data.data.length === 0) {
-          list.innerHTML = '<div class="col-12"><p class="text-muted">You have no tickets.</p></div>';
-          return;
-        }
-        list.innerHTML = data.data.map(t => \`
-          <div class="col-md-6 col-lg-4 mb-4">
-            <div class="card shadow-sm border-0 h-100">
-              <div class="card-body">
-                <p class="text-muted mb-1">\${esc(t.business ? t.business.name : '')} — \${esc(t.service ? t.service.name : '')}</p>
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                  <h1 class="display-5 fw-bold text-primary m-0">\${esc(t.ticketNumber)}</h1>
-                  <span class="badge bg-\${t.status === 'waiting' ? 'warning' : t.status === 'called' || t.status === 'serving' ? 'success' : 'secondary'}">\${esc(t.status.toUpperCase())}</span>
-                </div>
-                <p class="text-muted mb-1"><small>Joined: \${new Date(t.createdAt).toLocaleString()}</small></p>
-                \${['waiting', 'called', 'serving'].includes(t.status) ? \`<a href="/ticket-status/\${t._id}" class="btn btn-outline-primary w-100 mt-3">View Live Status</a>\` : ''}
-              </div>
-            </div>
-          </div>
-        \`).join('');
+    const socket = io();
+
+    function loadTickets() {
+      fetch('/api/queue/my-tickets', { credentials: 'include' })
+        .then(function (res) {
+          if (res.status === 401) { window.location.href = '/login'; return null; }
+          return res.json();
+        })
+        .then(function (data) {
+          if (!data || !data.success) return;
+          const list = document.getElementById('ticket-list');
+          if (data.data.length === 0) {
+            list.innerHTML = '<div class="col-12"><p class="text-muted">You have no tickets.</p></div>';
+            return;
+          }
+          list.innerHTML = data.data.map(function (t) {
+            const statusColor = t.status === 'waiting' ? 'warning' : (t.status === 'called' || t.status === 'serving') ? 'success' : 'secondary';
+            const liveBtn = ['waiting', 'called', 'serving'].includes(t.status) ? '<a href="/ticket-status/' + t._id + '" class="btn btn-outline-primary w-100 mt-3">View Live Status</a>' : '';
+            const cancelBtn = t.status === 'waiting' ? '<button class="btn btn-outline-danger w-100 mt-2" data-cancel-ticket="' + t._id + '">Cancel Ticket</button>' : '';
+            return '<div class="col-md-6 col-lg-4 mb-4">' +
+              '<div class="card shadow-sm border-0 h-100">' +
+              '<div class="card-body">' +
+              '<p class="text-muted mb-1">' + esc(t.business ? t.business.name : '') + ' — ' + esc(t.service ? t.service.name : '') + '</p>' +
+              '<div class="d-flex justify-content-between align-items-center mb-3">' +
+              '<h1 class="display-5 fw-bold text-primary m-0">' + esc(t.ticketNumber) + '</h1>' +
+              '<span class="badge bg-' + statusColor + '">' + esc(t.status.toUpperCase()) + '</span>' +
+              '</div>' +
+              '<p class="text-muted mb-1"><small>Joined: ' + new Date(t.createdAt).toLocaleString() + '</small></p>' +
+              liveBtn + cancelBtn +
+              '</div>' +
+              '</div>' +
+              '</div>';
+          }).join('');
+
+          data.data.forEach(function (t) {
+            if (['waiting', 'called', 'serving'].includes(t.status)) {
+              socket.emit('join:ticket_room', { ticketId: t._id });
+            }
+          });
+
+          document.querySelectorAll('[data-cancel-ticket]').forEach(function (btn) {
+            btn.addEventListener('click', function () { cancelTicket(this.getAttribute('data-cancel-ticket')); });
+          });
+        });
+    }
+
+    async function cancelTicket(id) {
+      const reasons = ['Too long wait', 'Change of plans', 'Personal emergency', 'Booked by mistake', 'Other'];
+      const reason = prompt('Reason for cancelling?\n\n' + reasons.map(function (r, i) { return (i + 1) + '. ' + r; }).join('\n') + '\n\nEnter number (1-5):');
+      if (!reason) return;
+      const index = parseInt(reason) - 1;
+      const selectedReason = (index >= 0 && index < reasons.length) ? reasons[index] : 'Other';
+      await fetch('/api/queue/cancel/' + id, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ reason: selectedReason })
       });
+      loadTickets();
+      showToast('Ticket cancelled: ' + selectedReason, 'warning');
+    }
+
+    socket.on('ticket:status_update', function () { loadTickets(); });
+    socket.on('queue:live_update', function () { loadTickets(); });
+
+    loadTickets();
   </script>
-` }) %>
+  ` }) %>
