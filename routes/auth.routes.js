@@ -3,7 +3,7 @@ const { body } = require('express-validator');
 const {
   register, login, logout, getMe, updatePassword,
   forgotPassword, resetPassword, refreshToken,
-  verifyOtp, resendOtp,
+  verifyOtp, resendOtp, acceptStaffInvite,
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
@@ -38,6 +38,7 @@ router.post('/refresh', refreshToken);
 
 router.post('/verify-otp', otpRules, validate, verifyOtp);
 router.post('/resend-otp', body('email').isEmail().withMessage('Valid email required').normalizeEmail(), validate, resendOtp);
+router.post('/accept-invite', acceptStaffInvite);
 
 router.post('/forgotpassword', body('email').isEmail().withMessage('Please provide a valid email address'), validate, forgotPassword);
 router.put('/resetpassword/:token', body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'), validate, resetPassword);

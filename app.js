@@ -188,6 +188,7 @@ app.get('/register', (req, res) => {
   res.render('auth/register', { appName: APP_NAME, error: null, user: null });
 });
 app.get('/verify-otp', (req, res) => res.render('auth/verify-otp', { appName: APP_NAME, user: null }));
+app.get('/accept-invite', (req, res) => res.render('auth/accept-invite', { appName: APP_NAME, user: null }));
 app.get('/forgot-password', (req, res) => res.render('auth/forgot-password', { appName: APP_NAME, error: null, success: null, user: res.locals.user }));
 app.get('/reset-password/:token', (req, res) => res.render('auth/reset-password', { token: escapeHtml(req.params.token), appName: APP_NAME, error: null, user: res.locals.user }));
 

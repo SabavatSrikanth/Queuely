@@ -6,12 +6,33 @@
   <script>
     function esc(str) {
       if (str === null || str === undefined) return '';
-      const div = document.createElement('div');
-      div.textContent = String(str);
-      return div.innerHTML;
+      var d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
     }
+    var socket = io();
 
-    const socket = io();
+    function makeCard(t) {
+      var statusColor = t.status === 'waiting' ? 'warning' : (t.status === 'called' || t.status === 'serving') ? 'success' : 'secondary';
+      var div = document.createElement('div');
+      div.className = 'col-md-6 col-lg-4 mb-4';
+      var inner = '<div class="card shadow-sm border-0 h-100"><div class="card-body">';
+      inner += '<p class="text-muted mb-1">' + esc(t.business ? t.business.name : '') + ' - ' + esc(t.service ? t.service.name : '') + '</p>';
+      inner += '<div class="d-flex justify-content-between align-items-center mb-3">';
+      inner += '<h1 class="display-5 fw-bold text-primary m-0">' + esc(t.ticketNumber) + '</h1>';
+      inner += '<span class="badge bg-' + statusColor + '">' + esc(t.status.toUpperCase()) + '</span>';
+      inner += '</div>';
+      inner += '<p class="text-muted mb-1"><small>Joined: ' + new Date(t.createdAt).toLocaleString() + '</small></p>';
+      if (['waiting', 'called', 'serving'].indexOf(t.status) !== -1) {
+        inner += '<a href="/ticket-status/' + t._id + '" class="btn btn-outline-primary w-100 mt-3">View Live Status</a>';
+      }
+      if (t.status === 'waiting') {
+        inner += '<button class="btn btn-outline-danger w-100 mt-2" data-cancel-id="' + t._id + '">Cancel Ticket</button>';
+      }
+      inner += '</div></div>';
+      div.innerHTML = inner;
+      return div;
+    }
 
     function loadTickets() {
       fetch('/api/queue/my-tickets', { credentials: 'include' })
@@ -21,56 +42,43 @@
         })
         .then(function (data) {
           if (!data || !data.success) return;
-          const list = document.getElementById('ticket-list');
+          var list = document.getElementById('ticket-list');
+          list.innerHTML = '';
           if (data.data.length === 0) {
             list.innerHTML = '<div class="col-12"><p class="text-muted">You have no tickets.</p></div>';
             return;
           }
-          list.innerHTML = data.data.map(function (t) {
-            const statusColor = t.status === 'waiting' ? 'warning' : (t.status === 'called' || t.status === 'serving') ? 'success' : 'secondary';
-            const liveBtn = ['waiting', 'called', 'serving'].includes(t.status) ? '<a href="/ticket-status/' + t._id + '" class="btn btn-outline-primary w-100 mt-3">View Live Status</a>' : '';
-            const cancelBtn = t.status === 'waiting' ? '<button class="btn btn-outline-danger w-100 mt-2" data-cancel-ticket="' + t._id + '">Cancel Ticket</button>' : '';
-            return '<div class="col-md-6 col-lg-4 mb-4">' +
-              '<div class="card shadow-sm border-0 h-100">' +
-              '<div class="card-body">' +
-              '<p class="text-muted mb-1">' + esc(t.business ? t.business.name : '') + ' — ' + esc(t.service ? t.service.name : '') + '</p>' +
-              '<div class="d-flex justify-content-between align-items-center mb-3">' +
-              '<h1 class="display-5 fw-bold text-primary m-0">' + esc(t.ticketNumber) + '</h1>' +
-              '<span class="badge bg-' + statusColor + '">' + esc(t.status.toUpperCase()) + '</span>' +
-              '</div>' +
-              '<p class="text-muted mb-1"><small>Joined: ' + new Date(t.createdAt).toLocaleString() + '</small></p>' +
-              liveBtn + cancelBtn +
-              '</div>' +
-              '</div>' +
-              '</div>';
-          }).join('');
-
           data.data.forEach(function (t) {
-            if (['waiting', 'called', 'serving'].includes(t.status)) {
+            var card = makeCard(t);
+            list.appendChild(card);
+            if (['waiting', 'called', 'serving'].indexOf(t.status) !== -1) {
               socket.emit('join:ticket_room', { ticketId: t._id });
             }
-          });
-
-          document.querySelectorAll('[data-cancel-ticket]').forEach(function (btn) {
-            btn.addEventListener('click', function () { cancelTicket(this.getAttribute('data-cancel-ticket')); });
+            var cancelBtn = card.querySelector('[data-cancel-id]');
+            if (cancelBtn) {
+              cancelBtn.addEventListener('click', function () {
+                cancelTicket(this.getAttribute('data-cancel-id'));
+              });
+            }
           });
         });
     }
 
-    async function cancelTicket(id) {
-      const reasons = ['Too long wait', 'Change of plans', 'Personal emergency', 'Booked by mistake', 'Other'];
-      const reason = prompt('Reason for cancelling?\n\n' + reasons.map(function (r, i) { return (i + 1) + '. ' + r; }).join('\n') + '\n\nEnter number (1-5):');
+    function cancelTicket(id) {
+      var reason = prompt('Select reason: 1=Too long wait, 2=Change of plans, 3=Personal emergency, 4=Booked by mistake, 5=Other. Enter number:');
       if (!reason) return;
-      const index = parseInt(reason) - 1;
-      const selectedReason = (index >= 0 && index < reasons.length) ? reasons[index] : 'Other';
-      await fetch('/api/queue/cancel/' + id, {
+      var reasons = ['Too long wait', 'Change of plans', 'Personal emergency', 'Booked by mistake', 'Other'];
+      var index = parseInt(reason) - 1;
+      var selectedReason = (index >= 0 && index < reasons.length) ? reasons[index] : 'Other';
+      fetch('/api/queue/cancel/' + id, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({ reason: selectedReason })
+      }).then(function () {
+        loadTickets();
+        showToast('Ticket cancelled!', 'warning');
       });
-      loadTickets();
-      showToast('Ticket cancelled: ' + selectedReason, 'warning');
     }
 
     socket.on('ticket:status_update', function () { loadTickets(); });

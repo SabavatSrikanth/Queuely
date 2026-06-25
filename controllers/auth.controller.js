@@ -230,4 +230,36 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   });
 
   sendTokenResponse(user, 200, res);
+}); // <-- THIS bracket was missing, which trapped acceptStaffInvite inside!
+
+exports.acceptStaffInvite = asyncHandler(async (req, res, next) => {
+  const { token, email, name, password } = req.body;
+  if (!token || !email || !name || !password) {
+    return next(new ApiError('All fields are required', 400));
+  }
+  if (password.length < 8) {
+    return next(new ApiError('Password must be at least 8 characters', 400));
+  }
+
+  const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+  const user = await User.findOne({
+    email,
+    emailVerifyToken: hashedToken,
+    emailVerifyExpiry: { $gt: Date.now() },
+    role: 'staff',
+    isActive: false,
+  });
+
+  if (!user) return next(new ApiError('Invalid or expired invitation link', 400));
+
+  user.name = name;
+  user.password = password;
+  user.isEmailVerified = true;
+  user.isActive = true;
+  user.emailVerifyToken = undefined;
+  user.emailVerifyExpiry = undefined;
+  user.lastLoginAt = Date.now();
+  await user.save();
+
+  sendTokenResponse(user, 200, res);
 });

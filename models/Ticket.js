@@ -45,6 +45,10 @@ const TicketSchema = new mongoose.Schema({
     enum: ['waiting', 'called', 'serving', 'served', 'skipped', 'cancelled', 'no_show'],
     default: 'waiting'
   },
+  cancellationReason: {
+  type: String,
+  default: null,
+},
   position: {
     type: Number,
     required: true

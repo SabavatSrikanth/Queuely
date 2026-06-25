@@ -1,66 +1,109 @@
-<%- include('../layouts/main', { title: 'Settings - ' + appName, body: `
-  <h2 class="fw-bold mb-4">Business Settings</h2>
-  <div id="settings-error" class="alert alert-danger d-none"></div>
-  <div id="settings-success" class="alert alert-success d-none"></div>
+<%- include('../layouts/main', { title: 'Settings - ' + appName, body: ` <h2 class="fw-bold mb-4">Business Settings</h2>
 
-  <div class="card shadow-sm border-0 mb-4">
-    <div class="card-body">
-      <h5 class="fw-bold mb-3">Business Profile</h5>
-      <div class="row g-3">
-        <div class="col-md-6">
-          <label class="form-label">Business Name</label>
-          <input type="text" id="biz-name" class="form-control">
+  <ul class="nav nav-tabs mb-4">
+    <li class="nav-item"><a class="nav-link active" id="tab-profile" href="#">Business Profile</a></li>
+    <li class="nav-item"><a class="nav-link" id="tab-staff" href="#">Staff Management</a></li>
+  </ul>
+
+  <div id="panel-profile">
+    <div id="settings-error" class="alert alert-danger d-none"></div>
+    <div id="settings-success" class="alert alert-success d-none"></div>
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Business Profile</h5>
+        <div class="row g-3">
+          <div class="col-md-6">
+            <label class="form-label">Business Name</label>
+            <input type="text" id="biz-name" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Category</label>
+            <select id="biz-category" class="form-select">
+              <option value="healthcare">Healthcare</option>
+              <option value="salon_beauty">Salon & Beauty</option>
+              <option value="banking">Banking</option>
+              <option value="government">Government</option>
+              <option value="education">Education</option>
+              <option value="retail">Retail</option>
+              <option value="legal">Legal</option>
+              <option value="fitness">Fitness</option>
+              <option value="food_beverage">Food & Beverage</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+          <div class="col-12">
+            <label class="form-label">Description</label>
+            <textarea id="biz-desc" class="form-control" rows="3"></textarea>
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Contact Phone</label>
+            <input type="text" id="biz-phone" class="form-control">
+          </div>
+          <div class="col-md-6">
+            <label class="form-label">Contact Email</label>
+            <input type="email" id="biz-email" class="form-control">
+          </div>
         </div>
-        <div class="col-md-6">
-          <label class="form-label">Category</label>
-          <select id="biz-category" class="form-select">
-            <option value="healthcare">Healthcare</option>
-            <option value="salon_beauty">Salon & Beauty</option>
-            <option value="banking">Banking</option>
-            <option value="government">Government</option>
-            <option value="education">Education</option>
-            <option value="retail">Retail</option>
-            <option value="legal">Legal</option>
-            <option value="fitness">Fitness</option>
-            <option value="food_beverage">Food & Beverage</option>
-            <option value="other">Other</option>
-          </select>
+        <button class="btn btn-primary mt-3" id="btn-save-settings">Save Changes</button>
+      </div>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Account</h5>
+        <a href="/logout" class="btn btn-outline-secondary">Log Out</a>
+      </div>
+    </div>
+  </div>
+
+  <div id="panel-staff" style="display:none;">
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Invite Staff Member</h5>
+        <div id="invite-error" class="alert alert-danger d-none"></div>
+        <div id="invite-success" class="alert alert-success d-none"></div>
+        <div class="input-group">
+          <input type="email" id="invite-email" class="form-control" placeholder="Staff email address">
+          <button class="btn btn-primary" id="btn-invite">Send Invitation</button>
         </div>
-        <div class="col-12">
-          <label class="form-label">Description</label>
-          <textarea id="biz-desc" class="form-control" rows="3"></textarea>
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Contact Phone</label>
-          <input type="text" id="biz-phone" class="form-control">
-        </div>
-        <div class="col-md-6">
-          <label class="form-label">Contact Email</label>
-          <input type="email" id="biz-email" class="form-control">
+        <small class="text-muted mt-2 d-block">Staff can manage queues but cannot change business settings.</small>
+      </div>
+    </div>
+    <div class="card shadow-sm border-0">
+      <div class="card-body">
+        <h5 class="fw-bold mb-3">Current Staff</h5>
+        <div id="staff-list">
+          <p class="text-muted">Loading staff...</p>
         </div>
       </div>
-      <button class="btn btn-primary mt-3" id="btn-save-settings">Save Changes</button>
     </div>
   </div>
-
-  <div class="card shadow-sm border-0">
-    <div class="card-body">
-      <h5 class="fw-bold mb-3">Account</h5>
-      <a href="/logout" class="btn btn-outline-secondary">Log Out</a>
-    </div>
-  </div>
-`, script: `
+  `, script: `
   <script>
-    let businessId = null;
+    function esc(str) {
+      if (str === null || str === undefined) return '';
+      var d = document.createElement('div');
+      d.textContent = String(str);
+      return d.innerHTML;
+    }
+
+    var businessId = null;
+
+    function showTab(tab) {
+      document.getElementById('panel-profile').style.display = tab === 'profile' ? 'block' : 'none';
+      document.getElementById('panel-staff').style.display = tab === 'staff' ? 'block' : 'none';
+      document.getElementById('tab-profile').classList.toggle('active', tab === 'profile');
+      document.getElementById('tab-staff').classList.toggle('active', tab === 'staff');
+      if (tab === 'staff') loadStaff();
+    }
 
     async function init() {
-      const meRes = await fetch('/api/auth/me');
-      const me = await meRes.json();
+      var meRes = await fetch('/api/auth/me');
+      var me = await meRes.json();
       if (!me.success || !me.data.businessId) return;
       businessId = me.data.businessId;
 
-      const bizRes = await fetch('/api/businesses/' + businessId);
-      const biz = await bizRes.json();
+      var bizRes = await fetch('/api/businesses/' + businessId);
+      var biz = await bizRes.json();
       if (!biz.success) return;
 
       document.getElementById('biz-name').value = biz.data.name || '';
@@ -71,12 +114,11 @@
     }
 
     async function saveSettings() {
-      const errBox = document.getElementById('settings-error');
-      const sucBox = document.getElementById('settings-success');
+      var errBox = document.getElementById('settings-error');
+      var sucBox = document.getElementById('settings-success');
       errBox.classList.add('d-none');
       sucBox.classList.add('d-none');
-
-      const res = await fetch('/api/businesses/' + businessId, {
+      var res = await fetch('/api/businesses/' + businessId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -89,7 +131,7 @@
           }
         })
       });
-      const data = await res.json();
+      var data = await res.json();
       if (data.success) {
         sucBox.textContent = 'Settings saved successfully.';
         sucBox.classList.remove('d-none');
@@ -97,12 +139,91 @@
       } else {
         errBox.textContent = data.error || data.message || 'Save failed.';
         errBox.classList.remove('d-none');
-        showToast(data.error || data.message || 'Save failed.', 'error');
+        showToast(data.error || 'Save failed.', 'error');
       }
     }
 
+    async function loadStaff() {
+      var res = await fetch('/api/users/staff', { credentials: 'include' });
+      var data = await res.json();
+      var container = document.getElementById('staff-list');
+      if (!data.success || data.data.length === 0) {
+        container.innerHTML = '<p class="text-muted">No staff members yet. Invite someone above!</p>';
+        return;
+      }
+      container.innerHTML = '<div class="table-responsive"><table class="table align-middle">' +
+        '<thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th>Action</th></tr></thead>' +
+        '<tbody>' +
+        data.data.map(function (s) {
+          var statusBadge = s.isActive ? '<span class="badge bg-success">Active</span>' : '<span class="badge bg-warning text-dark">Pending</span>';
+          return '<tr>' +
+            '<td>' + esc(s.name) + '</td>' +
+            '<td>' + esc(s.email) + '</td>' +
+            '<td><span class="badge bg-secondary">' + esc(s.role) + '</span></td>' +
+            '<td>' + statusBadge + '</td>' +
+            '<td><button class="btn btn-sm btn-outline-danger" data-remove-id="' + s._id + '">Remove</button></td>' +
+            '</tr>';
+        }).join('') +
+        '</tbody></table></div>';
+
+      document.querySelectorAll('[data-remove-id]').forEach(function (btn) {
+        btn.addEventListener('click', function () { removeStaff(this.getAttribute('data-remove-id')); });
+      });
+    }
+
+    async function inviteStaff() {
+      var email = document.getElementById('invite-email').value.trim();
+      var errBox = document.getElementById('invite-error');
+      var sucBox = document.getElementById('invite-success');
+      errBox.classList.add('d-none');
+      sucBox.classList.add('d-none');
+
+      if (!email) {
+        errBox.textContent = 'Please enter an email address.';
+        errBox.classList.remove('d-none');
+        return;
+      }
+
+      var res = await fetch('/api/users/staff/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ email: email })
+      });
+      var data = await res.json();
+      if (data.success) {
+        sucBox.textContent = 'Invitation sent to ' + email + '!';
+        sucBox.classList.remove('d-none');
+        document.getElementById('invite-email').value = '';
+        showToast('Invitation sent!', 'success');
+        loadStaff();
+      } else {
+        errBox.textContent = data.error || data.message || 'Could not send invitation.';
+        errBox.classList.remove('d-none');
+        showToast(data.error || 'Failed to send invitation.', 'error');
+      }
+    }
+
+    async function removeStaff(id) {
+      if (!confirm('Remove this staff member?')) return;
+      var res = await fetch('/api/users/staff/' + id, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      var data = await res.json();
+      if (data.success) {
+        showToast('Staff member removed.', 'warning');
+        loadStaff();
+      } else {
+        showToast(data.error || 'Could not remove staff.', 'error');
+      }
+    }
+
+    document.getElementById('tab-profile').addEventListener('click', function (e) { e.preventDefault(); showTab('profile'); });
+    document.getElementById('tab-staff').addEventListener('click', function (e) { e.preventDefault(); showTab('staff'); });
     document.getElementById('btn-save-settings').addEventListener('click', saveSettings);
+    document.getElementById('btn-invite').addEventListener('click', inviteStaff);
 
     init();
   </script>
-` }) %>
+  ` }) %>

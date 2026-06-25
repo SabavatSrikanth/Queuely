@@ -386,6 +386,7 @@ class QueueService {
 
     const oldPosition = ticket.position;
     ticket.status = status;
+
     ticket.completedAt = new Date();
     await ticket.save();
 

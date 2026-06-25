@@ -1,5 +1,5 @@
 const express = require('express');
-const { joinQueue, getLiveQueueState, getTicketStatus, callNext, serveTicket, markServed, skipTicket, cancelTicket, markNoShow, getMyTickets } = require('../controllers/queue.controller');
+const { joinQueue, getLiveQueueState, getTicketStatus, callNext, serveTicket, markServed, skipTicket, cancelTicket, markNoShow, getMyTickets, getCancelledTickets } = require('../controllers/queue.controller');
 const { protect, authorize, attachUser } = require('../middleware/auth.middleware');
 
 const router = express.Router();
@@ -26,5 +26,6 @@ router.put('/serving/:ticketId', protect, authorize('staff', 'branch_manager', '
 router.put('/served/:ticketId', protect, authorize('staff', 'branch_manager', 'business_owner', 'super_admin'), markServed);
 router.put('/skip/:ticketId', protect, authorize('staff', 'branch_manager', 'business_owner', 'super_admin'), skipTicket);
 router.put('/no-show/:ticketId', protect, authorize('staff', 'branch_manager', 'business_owner', 'super_admin'), markNoShow);
+router.get('/cancelled/:businessId', protect, authorize('staff', 'branch_manager', 'business_owner', 'super_admin'), getCancelledTickets);
 
 module.exports = router;

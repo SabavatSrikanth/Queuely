@@ -37,12 +37,21 @@
         <button class="btn btn-success btn-lg w-100 mb-3" id="btn-call-next"><i class="bi bi-megaphone-fill"></i> Call
           Next Ticket</button>
 
-        <div class="row g-2">
+        <div class="row g-2 mb-4">
           <div class="col-4"><button class="btn btn-outline-primary w-100" id="btn-serve">Start Serving</button></div>
           <div class="col-4"><button class="btn btn-outline-success w-100" id="btn-done">Mark Done</button></div>
           <div class="col-4"><button class="btn btn-outline-danger w-100" id="btn-noshow">No Show</button></div>
         </div>
         <div id="action-error" class="text-danger mt-3 text-center" style="display:none;"></div>
+
+        <hr>
+        <div class="d-flex justify-content-between align-items-center mt-3 mb-2">
+          <h6 class="fw-bold m-0">Cancelled Tickets Today</h6>
+          <button class="btn btn-sm btn-outline-secondary" id="btn-refresh-cancelled">Refresh</button>
+        </div>
+        <div id="cancelled-list">
+          <p class="text-muted text-center" style="font-size:0.875rem;">No cancelled tickets today.</p>
+        </div>
       </div>
     </div>
   </div>
@@ -57,6 +66,7 @@
 
     let currentServiceId = '';
     let calledTicketId = '';
+    let businessId = '';
     const socket = io();
 
     socket.on('connect', function () {
@@ -89,7 +99,8 @@
           select.innerHTML = '<option value="">No business found — create one on the Dashboard first</option>';
           return;
         }
-        const res = await fetch('/api/services?business=' + me.data.businessId);
+        businessId = me.data.businessId;
+        const res = await fetch('/api/services?business=' + businessId);
         const data = await res.json();
         if (!data.success || data.data.length === 0) {
           select.innerHTML = '<option value="">No services found — add one under Branches & Services</option>';
@@ -116,6 +127,7 @@
       document.getElementById('queue-controls').style.display = 'block';
       socket.emit('join:queue_room', { serviceId: currentServiceId });
       refreshQueue();
+      loadCancelledTickets();
     }
 
     async function refreshQueue() {
@@ -124,6 +136,33 @@
         const data = await res.json();
         if (data.success) renderSnapshot(data.data);
       } catch (e) { }
+    }
+
+    async function loadCancelledTickets() {
+      try {
+        const today = new Date().toISOString().split('T')[0];
+        const res = await fetch('/api/queue/cancelled/' + businessId + '?service=' + currentServiceId + '&date=' + today);
+        const data = await res.json();
+        const container = document.getElementById('cancelled-list');
+        if (!data.success || !data.data || data.data.length === 0) {
+          container.innerHTML = '<p class="text-muted text-center" style="font-size:0.875rem;">No cancelled tickets today.</p>';
+          return;
+        }
+        container.innerHTML = '<div class="table-responsive"><table class="table table-sm">' +
+          '<thead><tr><th>Ticket</th><th>Customer</th><th>Reason</th><th>Time</th></tr></thead>' +
+          '<tbody>' +
+          data.data.map(function (t) {
+            return '<tr>' +
+              '<td><span class="badge bg-secondary">' + esc(t.ticketNumber) + '</span></td>' +
+              '<td>' + esc(t.guestInfo ? t.guestInfo.name : (t.customer ? t.customer.name : 'Unknown')) + '</td>' +
+              '<td>' + esc(t.cancellationReason || 'No reason given') + '</td>' +
+              '<td><small>' + new Date(t.updatedAt).toLocaleTimeString() + '</small></td>' +
+              '</tr>';
+          }).join('') +
+          '</tbody></table></div>';
+      } catch (e) {
+        document.getElementById('cancelled-list').innerHTML = '<p class="text-muted text-center" style="font-size:0.875rem;">Could not load cancelled tickets.</p>';
+      }
     }
 
     function showActionError(msg) {
@@ -182,6 +221,7 @@
     document.getElementById('btn-serve').addEventListener('click', serveCurrent);
     document.getElementById('btn-done').addEventListener('click', markDone);
     document.getElementById('btn-noshow').addEventListener('click', markNoShow);
+    document.getElementById('btn-refresh-cancelled').addEventListener('click', loadCancelledTickets);
 
     populateServices();
   </script>

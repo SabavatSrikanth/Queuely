@@ -109,8 +109,14 @@ exports.cancelTicket = asyncHandler(async (req, res, next) => {
   }
 
   const updated = await QueueService.skipOrCancel(req.params.ticketId, 'cancelled', ownership);
+
+  if (req.body && req.body.reason) {
+  await Ticket.findByIdAndUpdate(req.params.ticketId, { cancellationReason: req.body.reason });
+  }
+
   res.status(200).json(new ApiResponse(200, updated, `Ticket ${updated.ticketNumber} cancelled`));
 });
+
 
 exports.markNoShow = asyncHandler(async (req, res, next) => {
   const ticket = await Ticket.findById(req.params.ticketId);
@@ -130,4 +136,32 @@ exports.getMyTickets = asyncHandler(async (req, res, next) => {
     .populate('service', 'name')
     .sort('-createdAt');
   res.status(200).json(new ApiResponse(200, tickets, 'Tickets fetched successfully'));
+});
+
+exports.getCancelledTickets = asyncHandler(async (req, res, next) => {
+  const { businessId } = req.params;
+  const { service, date } = req.query;
+
+  const filter = {
+    business: businessId,
+    status: 'cancelled',
+  };
+
+  if (service) filter.service = service;
+
+  if (date) {
+    const start = new Date(date);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(date);
+    end.setHours(23, 59, 59, 999);
+    filter.updatedAt = { $gte: start, $lte: end };
+  }
+
+  const tickets = await Ticket.find(filter)
+    .populate('customer', 'name')
+    .populate('service', 'name')
+    .sort('-updatedAt')
+    .limit(50);
+
+  res.status(200).json(new ApiResponse(200, tickets, 'Cancelled tickets fetched'));
 });

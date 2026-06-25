@@ -1,0 +1,76 @@
+<%- include('../layouts/main', { title: 'Accept Invitation - ' + appName, body: ` <div
+  class="row justify-content-center">
+  <div class="col-md-5">
+    <div class="card shadow-sm border-0 mt-4">
+      <div class="card-body p-4 text-center">
+        <div style="font-size:48px;">👋</div>
+        <h3 class="mb-2">Accept Staff Invitation</h3>
+        <p class="text-muted mb-4">Complete your registration to join the team.</p>
+        <div id="errorBox" class="alert alert-danger d-none text-start"></div>
+        <div id="successBox" class="alert alert-success d-none text-start"></div>
+        <div class="mb-3 text-start">
+          <label class="form-label">Your Name</label>
+          <input type="text" id="staff-name" class="form-control" placeholder="Enter your full name" required>
+        </div>
+        <div class="mb-3 text-start">
+          <label class="form-label">Email</label>
+          <input type="email" id="staff-email" class="form-control" readonly>
+        </div>
+        <div class="mb-4 text-start">
+          <label class="form-label">Password</label>
+          <input type="password" id="staff-password" class="form-control" placeholder="Min 8 characters" required>
+        </div>
+        <button class="btn btn-primary w-100 py-2" id="btn-accept">Complete Registration</button>
+      </div>
+    </div>
+  </div>
+  </div>
+  `, script: `
+  <script>
+    var params = new URLSearchParams(window.location.search);
+    var token = params.get('token') || '';
+    var email = params.get('email') || '';
+    document.getElementById('staff-email').value = email;
+
+    var errorBox = document.getElementById('errorBox');
+    var successBox = document.getElementById('successBox');
+
+    document.getElementById('btn-accept').addEventListener('click', async function () {
+      var name = document.getElementById('staff-name').value.trim();
+      var password = document.getElementById('staff-password').value;
+      errorBox.classList.add('d-none');
+
+      if (!name || !password) {
+        errorBox.textContent = 'Please fill in all fields.';
+        errorBox.classList.remove('d-none');
+        return;
+      }
+      if (password.length < 8) {
+        errorBox.textContent = 'Password must be at least 8 characters.';
+        errorBox.classList.remove('d-none');
+        return;
+      }
+
+      try {
+        var res = await fetch('/api/auth/accept-invite', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ token: token, email: email, name: name, password: password })
+        });
+        var data = await res.json();
+        if (data.success) {
+          successBox.textContent = 'Registration complete! Redirecting to dashboard...';
+          successBox.classList.remove('d-none');
+          setTimeout(function () { window.location.href = '/dashboard'; }, 1500);
+        } else {
+          errorBox.textContent = data.error || data.message || 'Could not complete registration.';
+          errorBox.classList.remove('d-none');
+        }
+      } catch (err) {
+        errorBox.textContent = 'Something went wrong. Please try again.';
+        errorBox.classList.remove('d-none');
+      }
+    });
+  </script>
+  ` }) %>
