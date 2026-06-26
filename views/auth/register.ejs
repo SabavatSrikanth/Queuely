@@ -1,38 +1,62 @@
 <%- include('../layouts/main', { title: 'Register - ' + appName, body: ` <div class="row justify-content-center">
-  <div class="col-md-6">
-    <div class="card shadow-sm border-0 mt-4">
+  <div class="col-md-5 col-lg-4">
+    <div class="text-center mb-4">
+      <div
+        style="width:64px; height:64px; background:linear-gradient(135deg,#4f46e5,#7c3aed); border-radius:16px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:1rem;">
+        <i class="bi bi-person-plus-fill text-white" style="font-size:1.75rem;"></i>
+      </div>
+      <h3 class="fw-bold mb-1">Create your account</h3>
+      <p class="text-muted">Join Queuely in seconds</p>
+    </div>
+    <div class="card shadow-sm border-0" style="border-radius:16px;">
       <div class="card-body p-4">
-        <h3 class="text-center mb-4">Create an Account</h3>
-        <div id="errorBox" class="alert alert-danger d-none"></div>
+        <div id="errorBox" class="alert alert-danger d-none rounded-3"></div>
         <form id="registerForm">
           <div class="mb-3">
-            <label class="form-label">Full Name</label>
-            <input type="text" class="form-control" id="name" required minlength="2" maxlength="50">
+            <label class="form-label fw-500">Full Name</label>
+            <input type="text" class="form-control" id="name" placeholder="John Doe" required minlength="2"
+              style="border-radius:10px; padding:0.75rem 1rem;">
           </div>
           <div class="mb-3">
-            <label class="form-label">Email address</label>
-            <input type="email" class="form-control" id="email" required>
+            <label class="form-label fw-500">Email address</label>
+            <input type="email" class="form-control" id="email" placeholder="you@example.com" required
+              style="border-radius:10px; padding:0.75rem 1rem;">
           </div>
           <div class="mb-3">
-            <label class="form-label">Phone Number</label>
-            <input type="text" class="form-control" id="phone">
+            <label class="form-label fw-500">Phone Number <span class="text-muted fw-normal">(optional)</span></label>
+            <input type="text" class="form-control" id="phone" placeholder="+91 9876543210"
+              style="border-radius:10px; padding:0.75rem 1rem;">
           </div>
           <div class="mb-3">
-            <label class="form-label">Password</label>
-            <input type="password" class="form-control" id="password" required minlength="8">
-            <div class="form-text">At least 8 characters.</div>
+            <label class="form-label fw-500">Password</label>
+            <input type="password" class="form-control" id="password" placeholder="Min 8 characters" required
+              minlength="8" style="border-radius:10px; padding:0.75rem 1rem;">
           </div>
           <div class="mb-4">
-            <label class="form-label">I want to:</label>
-            <select class="form-select" id="role">
-              <option value="customer">Use Queuely as a Customer</option>
-              <option value="business_owner">Manage my Business</option>
-            </select>
+            <label class="form-label fw-500">I want to</label>
+            <div class="row g-2">
+              <div class="col-6">
+                <input type="radio" class="btn-check" name="role" id="role-customer" value="customer" checked>
+                <label class="btn btn-outline-primary w-100" for="role-customer" style="border-radius:10px;">
+                  <i class="bi bi-person d-block mb-1" style="font-size:1.25rem;"></i>
+                  <span style="font-size:0.8rem;">Join Queues</span>
+                </label>
+              </div>
+              <div class="col-6">
+                <input type="radio" class="btn-check" name="role" id="role-owner" value="business_owner">
+                <label class="btn btn-outline-primary w-100" for="role-owner" style="border-radius:10px;">
+                  <i class="bi bi-building d-block mb-1" style="font-size:1.25rem;"></i>
+                  <span style="font-size:0.8rem;">Manage Business</span>
+                </label>
+              </div>
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary w-100 py-2">Register</button>
+          <button type="submit" class="btn btn-primary w-100 py-2" style="border-radius:10px; font-size:1rem;">Create
+            Account</button>
         </form>
-        <div class="text-center mt-3">
-          <p class="text-muted">Already have an account? <a href="/login" class="text-decoration-none">Log in</a></p>
+        <div class="text-center mt-4">
+          <p class="text-muted mb-0">Already have an account? <a href="/login" class="text-decoration-none fw-600">Sign
+              in</a></p>
         </div>
       </div>
     </div>
@@ -44,40 +68,40 @@
       e.preventDefault();
       const errorBox = document.getElementById('errorBox');
       errorBox.classList.add('d-none');
-      const submitBtn = e.target.querySelector('button[type="submit"]');
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Creating account...';
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Creating account...';
 
-      const payload = {
-        name: document.getElementById('name').value,
-        email: document.getElementById('email').value,
-        phone: document.getElementById('phone').value,
-        password: document.getElementById('password').value,
-        role: document.getElementById('role').value
-      };
+      const role = document.querySelector('input[name="role"]:checked').value;
 
       try {
         const res = await fetch('/api/auth/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({
+            name: document.getElementById('name').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            password: document.getElementById('password').value,
+            role: role
+          })
         });
         const data = await res.json();
         if (data.success && data.data.requiresVerification) {
-          window.location.href = '/verify-otp?email=' + encodeURIComponent(payload.email);
+          window.location.href = '/verify-otp?email=' + encodeURIComponent(document.getElementById('email').value);
         } else if (data.success) {
           window.location.href = data.data.user.role === 'business_owner' ? '/dashboard' : '/';
         } else {
           errorBox.textContent = data.error || data.message || 'Registration failed';
           errorBox.classList.remove('d-none');
-          submitBtn.disabled = false;
-          submitBtn.textContent = 'Register';
+          btn.disabled = false;
+          btn.innerHTML = 'Create Account';
         }
       } catch (err) {
-        errorBox.textContent = 'An error occurred during registration. Please try again.';
+        errorBox.textContent = 'An error occurred. Please try again.';
         errorBox.classList.remove('d-none');
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Register';
+        btn.disabled = false;
+        btn.innerHTML = 'Create Account';
       }
     });
   </script>

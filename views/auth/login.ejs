@@ -1,26 +1,32 @@
 <%- include('../layouts/main', { title: 'Login - ' + appName, body: `
   <div class="row justify-content-center">
-    <div class="col-md-5">
-      <div class="card shadow-sm border-0 mt-5">
+    <div class="col-md-5 col-lg-4">
+      <div class="text-center mb-4">
+        <div style="width:64px; height:64px; background:linear-gradient(135deg,#4f46e5,#7c3aed); border-radius:16px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:1rem;">
+          <i class="bi bi-layers-fill text-white" style="font-size:1.75rem;"></i>
+        </div>
+        <h3 class="fw-bold mb-1">Welcome back</h3>
+        <p class="text-muted">Sign in to your account</p>
+      </div>
+      <div class="card shadow-sm border-0" style="border-radius:16px;">
         <div class="card-body p-4">
-          <h3 class="text-center mb-4">Login to Queuely</h3>
-          <div id="errorBox" class="alert alert-danger d-none"></div>
+          <div id="errorBox" class="alert alert-danger d-none rounded-3"></div>
           <form id="loginForm">
             <div class="mb-3">
-              <label class="form-label">Email address</label>
-              <input type="email" class="form-control" id="email" required>
+              <label class="form-label fw-500">Email address</label>
+              <input type="email" class="form-control" id="email" placeholder="you@example.com" required style="border-radius:10px; padding:0.75rem 1rem;">
             </div>
             <div class="mb-3">
-              <label class="form-label">Password</label>
-              <input type="password" class="form-control" id="password" required>
+              <div class="d-flex justify-content-between">
+                <label class="form-label fw-500">Password</label>
+                <a href="/forgot-password" class="text-decoration-none" style="font-size:0.875rem;">Forgot password?</a>
+              </div>
+              <input type="password" class="form-control" id="password" placeholder="••••••••" required style="border-radius:10px; padding:0.75rem 1rem;">
             </div>
-            <div class="d-flex justify-content-between mb-4">
-              <a href="/forgot-password" class="text-decoration-none">Forgot password?</a>
-            </div>
-            <button type="submit" class="btn btn-primary w-100 py-2">Log In</button>
+            <button type="submit" class="btn btn-primary w-100 py-2 mt-2" style="border-radius:10px; font-size:1rem;">Sign In</button>
           </form>
-          <div class="text-center mt-3">
-            <p class="text-muted">Don't have an account? <a href="/register" class="text-decoration-none">Register</a></p>
+          <div class="text-center mt-4">
+            <p class="text-muted mb-0">Don't have an account? <a href="/register" class="text-decoration-none fw-600">Create one</a></p>
           </div>
         </div>
       </div>
@@ -28,19 +34,24 @@
   </div>
 `, script: `
   <script>
-    const redirectTarget = ${redirect ? `'${redirect}'` : 'null'};
+    const redirectTarget = ${redirect ? JSON.stringify(redirect) : 'null'};
 
-    document.getElementById('loginForm').addEventListener('submit', async (e) => {
+    document.getElementById('loginForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const errorBox = document.getElementById('errorBox');
       errorBox.classList.add('d-none');
-      const email = document.getElementById('email').value;
-      const password = document.getElementById('password').value;
+      const btn = e.target.querySelector('button[type="submit"]');
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Signing in...';
+
       try {
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email, password })
+          body: JSON.stringify({
+            email: document.getElementById('email').value,
+            password: document.getElementById('password').value
+          })
         });
         const data = await res.json();
         if (data.success) {
@@ -49,20 +60,18 @@
             return;
           }
           const role = data.data.user.role;
-          if (role === 'customer') {
-            window.location.href = '/';
-          } else if (role === 'super_admin') {
-            window.location.href = '/admin';
-          } else {
-            window.location.href = '/dashboard';
-          }
+          window.location.href = role === 'customer' ? '/' : role === 'super_admin' ? '/admin' : '/dashboard';
         } else {
           errorBox.textContent = data.error || data.message || 'Login failed';
           errorBox.classList.remove('d-none');
+          btn.disabled = false;
+          btn.innerHTML = 'Sign In';
         }
       } catch (err) {
-        errorBox.textContent = 'An error occurred during login. Please try again.';
+        errorBox.textContent = 'An error occurred. Please try again.';
         errorBox.classList.remove('d-none');
+        btn.disabled = false;
+        btn.innerHTML = 'Sign In';
       }
     });
   </script>

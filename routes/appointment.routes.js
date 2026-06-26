@@ -8,7 +8,7 @@ router.get('/slots/:serviceId', getAvailableSlots);
 router.post('/book/:serviceId', attachUser, bookAppointment); // Open to guests; attachUser attributes it to a logged-in customer when present
 
 router.get('/my', protect, authorize('customer'), getMyAppointments);
-router.get('/business/:id', protect, authorize('business_owner', 'branch_manager', 'super_admin'), getBusinessAppointments);
+router.get('/business/:id', protect, authorize('business_owner', 'branch_manager', 'staff', 'super_admin'), getBusinessAppointments);
 router.get('/:id', protect, getAppointment);
 
 router.put('/:id/confirm', protect, authorize('business_owner', 'branch_manager', 'staff', 'super_admin'), confirmAppointment);

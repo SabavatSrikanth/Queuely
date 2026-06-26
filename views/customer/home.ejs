@@ -1,18 +1,25 @@
-<%- include('../layouts/main', { title: 'Home - ' + appName, body: ` <div class="text-center py-5">
-  <h1 class="display-4 fw-bold text-primary mb-3">Skip the Waiting Room</h1>
-  <p class="lead text-muted mb-5">Join queues instantly, book appointments, and track your live wait time from your
-    phone.</p>
-  <div class="input-group mb-5 mx-auto" style="max-width: 600px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);">
-    <input type="text" class="form-control form-control-lg border-0" id="search-input"
-      placeholder="Search for hospitals, salons, banks...">
-    <button class="btn btn-primary px-4" type="button" id="btn-search"><i class="bi bi-search"></i> Search</button>
-  </div>
+<%- include('../layouts/main', { title: 'Home - ' + appName, body: `
+  <div style="background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%); border-radius: 16px; padding: 4rem 2rem; text-align: center; margin-bottom: 3rem; color: white;">
+    <h1 style="font-size: 2.5rem; font-weight: 800; margin-bottom: 1rem; letter-spacing: -0.5px;">Skip the Waiting Room</h1>
+    <p style="font-size: 1.1rem; opacity: 0.9; margin-bottom: 2rem;">Join queues instantly, book appointments, and track your live wait time.</p>
+    <div class="input-group mx-auto" style="max-width: 560px; box-shadow: 0 8px 30px rgba(0,0,0,0.2); border-radius: 12px; overflow: hidden;">
+      <input type="text" class="form-control form-control-lg border-0" id="search-input" placeholder="Search hospitals, salons, banks..." style="padding: 1rem 1.25rem; font-size: 1rem;">
+      <button class="btn px-4" type="button" id="btn-search" style="background: #fff; color: #4f46e5; font-weight: 600; border: none;"><i class="bi bi-search"></i> Search</button>
+    </div>
   </div>
 
-  <div class="row g-4 mt-2" id="business-list">
-    <div class="col-12 text-muted text-center">Loading businesses...</div>
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h5 class="fw-bold m-0">Available Businesses</h5>
+    <span class="text-muted" id="biz-count" style="font-size: 0.875rem;"></span>
   </div>
-  `, script: `
+
+  <div class="row g-4" id="business-list">
+    <div class="col-12 text-center py-5">
+      <div class="spinner-border text-primary" role="status"></div>
+      <p class="text-muted mt-3">Loading businesses...</p>
+    </div>
+  </div>
+`, script: `
   <script>
     function esc(str) {
       if (str === null || str === undefined) return '';
@@ -21,35 +28,79 @@
       return div.innerHTML;
     }
 
+    const categoryIcons = {
+      healthcare: 'bi-hospital',
+      salon_beauty: 'bi-scissors',
+      banking: 'bi-bank',
+      government: 'bi-building',
+      education: 'bi-book',
+      retail: 'bi-bag',
+      legal: 'bi-briefcase',
+      fitness: 'bi-heart-pulse',
+      food_beverage: 'bi-cup-hot',
+      other: 'bi-grid',
+    };
+
+    const categoryColors = {
+      healthcare: '#ef4444',
+      salon_beauty: '#ec4899',
+      banking: '#3b82f6',
+      government: '#6b7280',
+      education: '#f59e0b',
+      retail: '#10b981',
+      legal: '#8b5cf6',
+      fitness: '#f97316',
+      food_beverage: '#14b8a6',
+      other: '#4f46e5',
+    };
+
     let allBusinesses = [];
 
     function renderBusinesses(items) {
       const list = document.getElementById('business-list');
+      const countEl = document.getElementById('biz-count');
       if (items.length === 0) {
-        list.innerHTML = '<div class="col-12 text-center text-muted">No businesses found.</div>';
+        list.innerHTML = '<div class="col-12 text-center py-5"><i class="bi bi-search" style="font-size:3rem; color:#ccc;"></i><p class="text-muted mt-3">No businesses found.</p></div>';
+        countEl.textContent = '';
         return;
       }
-      list.innerHTML = items.map(function (b) {
-        return '<div class="col-md-4">' +
-          '<div class="card h-100 shadow-sm border-0">' +
-          '<div class="card-body">' +
-          '<h5 class="card-title fw-bold">' + esc(b.name) + '</h5>' +
-          '<p class="card-text text-muted mb-3"><i class="bi bi-geo-alt"></i> ' + esc(b.address ? b.address.city : '') + ', ' + esc(b.address ? b.address.country : '') + '</p>' +
-          '<span class="badge bg-secondary mb-3">' + esc(b.category) + '</span>' +
-          '<a href="/businesses/' + encodeURIComponent(b.slug) + '" class="btn btn-outline-primary w-100 mt-auto">View Services</a>' +
+      countEl.textContent = items.length + ' found';
+      list.innerHTML = items.map(function(b) {
+        var icon = categoryIcons[b.category] || 'bi-grid';
+        var color = categoryColors[b.category] || '#4f46e5';
+        var city = b.address ? b.address.city : '';
+        var country = b.address ? b.address.country : '';
+        var location = [city, country].filter(Boolean).join(', ');
+        var rating = b.averageRating ? b.averageRating.toFixed(1) : null;
+        return '<div class="col-md-4 col-sm-6">' +
+          '<div class="card border-0 shadow-sm h-100" style="border-radius:14px; overflow:hidden;">' +
+            '<div style="height:6px; background:' + color + ';"></div>' +
+            '<div class="card-body p-4">' +
+              '<div class="d-flex align-items-start gap-3 mb-3">' +
+                '<div style="width:48px; height:48px; background:' + color + '20; border-radius:12px; display:flex; align-items:center; justify-content:center; flex-shrink:0;">' +
+                  '<i class="bi ' + icon + '" style="color:' + color + '; font-size:1.3rem;"></i>' +
+                '</div>' +
+                '<div>' +
+                  '<h5 class="fw-bold mb-1" style="font-size:1rem;">' + esc(b.name) + '</h5>' +
+                  (location ? '<p class="text-muted mb-0" style="font-size:0.8rem;"><i class="bi bi-geo-alt"></i> ' + esc(location) + '</p>' : '') +
+                '</div>' +
+              '</div>' +
+              '<div class="d-flex align-items-center gap-2 mb-3">' +
+                '<span class="badge" style="background:' + color + '20; color:' + color + '; font-size:0.75rem;">' + esc(b.category ? b.category.replace('_', ' ') : '') + '</span>' +
+                (rating ? '<span class="badge bg-warning text-dark" style="font-size:0.75rem;"><i class="bi bi-star-fill"></i> ' + rating + '</span>' : '') +
+                (b.totalServed > 0 ? '<span class="badge bg-light text-muted" style="font-size:0.75rem;">' + b.totalServed + ' served</span>' : '') +
+              '</div>' +
+              '<a href="/businesses/' + encodeURIComponent(b.slug) + '" class="btn btn-primary w-100" style="border-radius:10px;">View Services <i class="bi bi-arrow-right"></i></a>' +
+            '</div>' +
           '</div>' +
-          '</div>' +
-          '</div>';
+        '</div>';
       }).join('');
     }
 
     function filterBusinesses() {
       const term = document.getElementById('search-input').value.trim().toLowerCase();
-      if (!term) {
-        renderBusinesses(allBusinesses);
-        return;
-      }
-      const filtered = allBusinesses.filter(function (b) {
+      if (!term) { renderBusinesses(allBusinesses); return; }
+      const filtered = allBusinesses.filter(function(b) {
         return (b.name && b.name.toLowerCase().includes(term)) ||
           (b.category && b.category.toLowerCase().includes(term)) ||
           (b.address && b.address.city && b.address.city.toLowerCase().includes(term));
@@ -58,20 +109,20 @@
     }
 
     document.getElementById('btn-search').addEventListener('click', filterBusinesses);
-    document.getElementById('search-input').addEventListener('keyup', function (e) {
+    document.getElementById('search-input').addEventListener('keyup', function(e) {
       if (e.key === 'Enter') filterBusinesses();
     });
 
     fetch('/api/businesses')
-      .then(function (res) { return res.json(); })
-      .then(function (data) {
+      .then(function(res) { return res.json(); })
+      .then(function(data) {
         if (data.success && data.data) {
           allBusinesses = data.data;
           renderBusinesses(allBusinesses);
         }
       })
-      .catch(function () {
+      .catch(function() {
         document.getElementById('business-list').innerHTML = '<div class="col-12 text-center text-muted">Could not load businesses.</div>';
       });
   </script>
-  ` }) %>
+` }) %>
