@@ -138,16 +138,19 @@
       }
 
       async function cancelAppt(id) {
-        if (confirm('Are you sure you want to cancel this appointment?')) {
-          await fetch('/api/appointments/' + id + '/cancel', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ reason: 'User requested' })
-          });
-          loadAppointments();
-          showToast('Appointment cancelled.', 'warning');
-        }
+        var reason = prompt('Select reason: 1=Change of plans, 2=Found another provider, 3=Personal emergency, 4=Booked by mistake, 5=Other. Enter number:');
+        if (!reason) return;
+        var reasons = ['Change of plans', 'Found another provider', 'Personal emergency', 'Booked by mistake', 'Other'];
+        var index = parseInt(reason) - 1;
+        var selectedReason = (index >= 0 && index < reasons.length) ? reasons[index] : 'Other';
+        await fetch('/api/appointments/' + id + '/cancel', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ reason: selectedReason })
+        });
+        loadAppointments();
+        showToast('Appointment cancelled: ' + selectedReason, 'warning');
       }
 
       document.getElementById('btn-find-slots').addEventListener('click', loadSlots);
