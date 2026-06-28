@@ -15,11 +15,9 @@ const getTransporter = () => {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASS,
       },
-      // Increased timeouts for cold-start cloud environments (Render free tier)
       connectionTimeout: 15000,
       greetingTimeout: 15000,
       socketTimeout: 30000,
-      // Force TLS for Gmail — prevents STARTTLS downgrade issues
       tls: {
         rejectUnauthorized: true,
       },
@@ -28,10 +26,6 @@ const getTransporter = () => {
   return transporter;
 };
 
-/**
- * Send an email
- * @param {object} options - { to, subject, html, text }
- */
 const sendEmail = async ({ to, subject, html, text }) => {
   const transport = getTransporter();
   const mailOptions = {
