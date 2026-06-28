@@ -10,12 +10,32 @@ services:
         value: production
       - key: PORT
         value: 3000
+      - key: CLIENT_URL
+        sync: false          # e.g. https://your-app.onrender.com
       - key: MONGODB_URI
         sync: false
       - key: JWT_SECRET
         sync: false
       - key: JWT_EXPIRES_IN
         value: 15m
+      - key: JWT_REFRESH_SECRET
+        sync: false
+      - key: JWT_REFRESH_EXPIRES_IN
+        value: 30d
+      # ── Email ──────────────────────────────────────────
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: 465
+      - key: EMAIL_SECURE
+        value: true
+      - key: EMAIL_USER
+        sync: false          # your Gmail address
+      - key: EMAIL_PASS
+        sync: false          # your Gmail App Password
+      - key: EMAIL_FROM
+        sync: false          # e.g. Queuely <you@gmail.com>
+      # ── Cloudinary ─────────────────────────────────────
       - key: CLOUDINARY_CLOUD_NAME
         sync: false
       - key: CLOUDINARY_API_KEY

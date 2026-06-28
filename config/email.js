@@ -4,18 +4,26 @@ let transporter;
 
 const getTransporter = () => {
   if (!transporter) {
+    const port = parseInt(process.env.EMAIL_PORT) || 465;
+    const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
+
     transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
-  port: parseInt(process.env.EMAIL_PORT) || 587,
-  secure: parseInt(process.env.EMAIL_PORT) === 465,
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  connectionTimeout: 5000,
-  greetingTimeout: 5000,
-  socketTimeout: 5000,
-});
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port,
+      secure,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+      // Increased timeouts for cold-start cloud environments (Render free tier)
+      connectionTimeout: 15000,
+      greetingTimeout: 15000,
+      socketTimeout: 30000,
+      // Force TLS for Gmail — prevents STARTTLS downgrade issues
+      tls: {
+        rejectUnauthorized: true,
+      },
+    });
   }
   return transporter;
 };
