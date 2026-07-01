@@ -1,26 +1,26 @@
 const nodemailer = require('nodemailer');
 
-const getTransporter = () => {
-  const port = parseInt(process.env.EMAIL_PORT) || 587;
-  const secure = process.env.EMAIL_SECURE === 'true' || port === 465;
+let transporter;
 
-  return nodemailer.createTransport({
-    host: process.env.EMAIL_HOST || 'smtp-relay.brevo.com',
-    port,
-    secure,
-    auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASS,
-    },
-    connectionTimeout: 15000,
-    greetingTimeout: 15000,
-    socketTimeout: 30000,
-    tls: {
-      rejectUnauthorized: false,
-    },
-  });
+const getTransporter = () => {
+  if (!transporter) {
+    transporter = nodemailer.createTransport({
+      host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+      port: parseInt(process.env.EMAIL_PORT) || 587,
+      secure: parseInt(process.env.EMAIL_PORT) === 465,
+      auth: {
+        user: process.env.EMAIL_USER,
+        pass: process.env.EMAIL_PASS,
+      },
+    });
+  }
+  return transporter;
 };
 
+/**
+ * Send an email
+ * @param {object} options - { to, subject, html, text }
+ */
 const sendEmail = async ({ to, subject, html, text }) => {
   const transport = getTransporter();
   const mailOptions = {
