@@ -87,11 +87,10 @@
           })
         });
         const data = await res.json();
-        if (data.success && data.data.requiresVerification) {
-          window.location.href = '/verify-otp?email=' + encodeURIComponent(document.getElementById('email').value);
-        } else if (data.success) {
+        if (data.success) {
           window.location.href = data.data.user.role === 'business_owner' ? '/dashboard' : '/';
-        } else {
+        }
+           else {
           errorBox.textContent = data.error || data.message || data.errors?.[0]?.msg || 'Registration failed';
           errorBox.classList.remove('d-none');
           btn.disabled = false;

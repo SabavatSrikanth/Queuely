@@ -48,83 +48,36 @@ const sendTokenResponse = (user, statusCode, res) => {
     }, 'Success'));
 };
 
-const generateOtp = () => Math.floor(100000 + Math.random() * 900000).toString();
-const hashOtp = (otp) => crypto.createHash('sha256').update(otp).digest('hex');
-
 exports.register = asyncHandler(async (req, res, next) => {
   const { name, email, password, phone, role } = req.body;
+
   const requestedRole = SELF_REGISTERABLE_ROLES.includes(role) ? role : 'customer';
+
   const existing = await User.findOne({ email });
-  if (existing) return next(new ApiError('An account with this email already exists', 409));
-
-  const otp = generateOtp();
-  const hashedOtp = hashOtp(otp);
-  const otpExpiry = new Date(Date.now() + 15 * 60 * 1000);
-
-  const user = await User.create({
-    name, email, password, phone, role: requestedRole,
-    isEmailVerified: false,
-    emailVerifyToken: hashedOtp,
-    emailVerifyExpiry: otpExpiry,
-  });
-
-  try {
-    const content = emailTemplates.verifyEmailOtp({ name: user.name, otp });
-    await sendEmail({ to: user.email, subject: content.subject, html: content.html });
-    console.log(`[Auth] OTP sent to ${user.email}`);
-  } catch (err) {
-    console.error('[Auth] Failed to send OTP email:', err.message);
+  if (existing) {
+    return next(new ApiError('An account with this email already exists', 409));
   }
 
-  res.status(201).json(new ApiResponse(201, {
-    email: user.email,
-    requiresVerification: true,
-  }, 'Account created. Please check your email for the verification OTP.'));
-});
-
-exports.verifyOtp = asyncHandler(async (req, res, next) => {
-  const { email, otp } = req.body;
-  if (!email || !otp) return next(new ApiError('Email and OTP are required', 400));
-
-  const hashedOtp = hashOtp(otp.toString().trim());
-  const user = await User.findOne({
+  const user = await User.create({
+    name,
     email,
-    emailVerifyToken: hashedOtp,
-    emailVerifyExpiry: { $gt: Date.now() },
+    password,
+    phone,
+    role: requestedRole,
+    isEmailVerified: true,
   });
 
-  if (!user) return next(new ApiError('Invalid or expired OTP. Please request a new one.', 400));
-
-  user.isEmailVerified = true;
-  user.emailVerifyToken = undefined;
-  user.emailVerifyExpiry = undefined;
   user.lastLoginAt = Date.now();
   await user.save({ validateBeforeSave: false });
 
-  sendTokenResponse(user, 200, res);
-});
+  // Best-effort welcome email — never blocks registration if it fails
+  sendEmail({
+    to: user.email,
+    subject: `Welcome to ${process.env.APP_NAME || 'Queuely'}!`,
+    html: `<p>Hi ${user.name},</p><p>Your account has been created successfully. You can now join queues and book appointments.</p>`,
+  }).catch((err) => console.error('[Auth] Welcome email failed (non-blocking):', err.message));
 
-exports.resendOtp = asyncHandler(async (req, res, next) => {
-  const { email } = req.body;
-  if (!email) return next(new ApiError('Email is required', 400));
-
-  const user = await User.findOne({ email, isEmailVerified: false });
-  if (!user) return res.status(200).json(new ApiResponse(200, {}, 'If an unverified account exists, a new OTP has been sent.'));
-
-  const otp = generateOtp();
-  user.emailVerifyToken = hashOtp(otp);
-  user.emailVerifyExpiry = new Date(Date.now() + 15 * 60 * 1000);
-  await user.save({ validateBeforeSave: false });
-
-  try {
-    const content = emailTemplates.verifyEmailOtp({ name: user.name, otp });
-    await sendEmail({ to: user.email, subject: content.subject, html: content.html });
-  } catch (err) {
-    console.error('[Auth] Failed to resend OTP:', err.message);
-    return next(new ApiError('Could not send OTP email. Please try again.', 500));
-  }
-
-  res.status(200).json(new ApiResponse(200, {}, 'A new OTP has been sent to your email.'));
+  sendTokenResponse(user, 201, res);
 });
 
 exports.login = asyncHandler(async (req, res, next) => {

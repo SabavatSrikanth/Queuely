@@ -31,27 +31,6 @@ const baseStyle = `
 
 const emailTemplates = {
 
-  verifyEmailOtp: ({ name, otp }) => ({
-  subject: `${otp} is your Queuely verification code`,
-  html: `<!DOCTYPE html><html><head><style>${baseStyle}</style></head><body>
-    <div class="wrapper">
-      <div class="header"><h1>📬 ${APP_NAME}</h1><p>Verify your email address</p></div>
-      <div class="body">
-        <p>Hi <strong>${name}</strong>,</p>
-        <p>Thanks for signing up! Use the verification code below to confirm your email address and activate your account.</p>
-        <div class="otp-box">
-          <div class="otp-label">Your Verification Code</div>
-          <div class="otp-code">${otp}</div>
-          <div class="otp-expiry">⏱ Expires in 15 minutes</div>
-        </div>
-        <p>Enter this code on the verification page to complete your registration.</p>
-        <p style="font-size:13px;color:#aaa;">If you didn't create a Queuely account, you can safely ignore this email.</p>
-      </div>
-      <div class="footer"><p>© ${new Date().getFullYear()} ${APP_NAME} · <a href="${CLIENT_URL}">Visit Website</a></p></div>
-    </div>
-  </body></html>`,
-}),
-
   verifyEmail: ({ name, verifyUrl }) => ({
     subject: `Verify your Queuely account`,
     html: `<!DOCTYPE html><html><head><style>${baseStyle}</style></head><body>

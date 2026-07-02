@@ -3,7 +3,7 @@ const { body } = require('express-validator');
 const {
   register, login, logout, getMe, updatePassword,
   forgotPassword, resetPassword, refreshToken,
-  verifyOtp, resendOtp, acceptStaffInvite,
+  acceptStaffInvite,
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
@@ -24,11 +24,6 @@ const loginRules = [
   body('password').notEmpty().withMessage('Password is required'),
 ];
 
-const otpRules = [
-  body('email').isEmail().withMessage('Please provide a valid email address').normalizeEmail(),
-  body('otp').notEmpty().withMessage('OTP is required').isLength({ min: 6, max: 6 }).withMessage('OTP must be 6 digits'),
-];
-
 router.post('/register', registerRules, validate, register);
 router.post('/login', loginRules, validate, login);
 router.post('/logout', protect, logout);
@@ -36,8 +31,6 @@ router.get('/me', protect, getMe);
 router.put('/me/password', protect, updatePassword);
 router.post('/refresh', refreshToken);
 
-router.post('/verify-otp', otpRules, validate, verifyOtp);
-router.post('/resend-otp', body('email').isEmail().withMessage('Valid email required').normalizeEmail(), validate, resendOtp);
 router.post('/accept-invite', acceptStaffInvite);
 
 router.post('/forgotpassword', body('email').isEmail().withMessage('Please provide a valid email address'), validate, forgotPassword);
