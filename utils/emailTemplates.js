@@ -22,11 +22,6 @@ const baseStyle = `
   .status-called { background:#fef3c7; color:#d97706; }
   .status-serving { background:#d1fae5; color:#059669; }
   .divider { border:none; border-top:1px solid #f0f0f0; margin:24px 0; }
-
-  .otp-box { background:#f8f7ff; border:2px solid #4f46e5; border-radius:12px; padding:32px; text-align:center; margin:24px 0; }
-  .otp-code { font-size:48px; font-weight:800; color:#4f46e5; letter-spacing:12px; font-family:monospace; }
- .otp-label { font-size:13px; color:#888; text-transform:uppercase; letter-spacing:1px; margin-bottom:12px; }
- .otp-expiry { font-size:13px; color:#ef4444; margin-top:12px; font-weight:600; }
 `;
 
 const emailTemplates = {

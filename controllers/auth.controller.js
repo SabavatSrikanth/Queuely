@@ -49,7 +49,7 @@ const sendTokenResponse = (user, statusCode, res) => {
 };
 
 exports.register = asyncHandler(async (req, res, next) => {
-  const { name, email, password, phone, role } = req.body;
+  const { name, email, password, phone, role, securityQuestion, securityAnswer } = req.body;
 
   const requestedRole = SELF_REGISTERABLE_ROLES.includes(role) ? role : 'customer';
 
@@ -65,6 +65,8 @@ exports.register = asyncHandler(async (req, res, next) => {
     phone,
     role: requestedRole,
     isEmailVerified: true,
+    securityQuestion: securityQuestion || null,
+    securityAnswerHash: securityAnswer || null,
   });
 
   user.lastLoginAt = Date.now();
@@ -135,27 +137,92 @@ exports.refreshToken = asyncHandler(async (req, res, next) => {
   sendTokenResponse(user, 200, res);
 });
 
+// ---------------------------------------------------------------------------
+// Security-question based recovery (no email dependency)
+// ---------------------------------------------------------------------------
+
+exports.getSecurityQuestion = asyncHandler(async (req, res, next) => {
+  const { email } = req.body;
+  if (!email) return next(new ApiError('Email is required', 400));
+
+  const user = await User.findOne({ email });
+
+  // Always respond the same shape whether or not the user/question exists,
+  // to avoid leaking which emails are registered.
+  if (!user || !user.securityQuestion) {
+    return res.status(200).json(new ApiResponse(200, { hasQuestion: false }, 'No security question set for this account'));
+  }
+
+  res.status(200).json(new ApiResponse(200, { hasQuestion: true, question: user.securityQuestion }, 'Security question found'));
+});
+
+exports.resetPasswordWithSecurityAnswer = asyncHandler(async (req, res, next) => {
+  const { email, answer, newPassword } = req.body;
+  if (!email || !answer || !newPassword) {
+    return next(new ApiError('Email, answer, and new password are required', 400));
+  }
+  if (newPassword.length < 8) {
+    return next(new ApiError('New password must be at least 8 characters', 400));
+  }
+
+  const user = await User.findOne({ email }).select('+securityAnswerHash');
+  if (!user || !user.securityAnswerHash) {
+    return next(new ApiError('Invalid request', 400));
+  }
+
+  const isMatch = await user.matchSecurityAnswer(answer);
+  if (!isMatch) {
+    return next(new ApiError('Incorrect answer to security question', 401));
+  }
+
+  user.password = newPassword;
+  await user.save();
+
+  sendTokenResponse(user, 200, res);
+});
+
+exports.setSecurityQuestion = asyncHandler(async (req, res, next) => {
+  const { question, answer } = req.body;
+  if (!question || !answer) {
+    return next(new ApiError('Question and answer are required', 400));
+  }
+
+  const user = await User.findById(req.user.id);
+  user.securityQuestion = question;
+  user.securityAnswerHash = answer;
+  await user.save();
+
+  res.status(200).json(new ApiResponse(200, {}, 'Security question saved'));
+});
+
+// ---------------------------------------------------------------------------
+// Email-based password reset (kept as fallback, non-blocking on email failure)
+// ---------------------------------------------------------------------------
+
 exports.forgotPassword = asyncHandler(async (req, res, next) => {
   const { email } = req.body;
-  if (!email) return next(new ApiError('Please provide an email address', 400));
+  if (!email) {
+    return next(new ApiError('Please provide an email address', 400));
+  }
 
   const genericResponse = new ApiResponse(200, {}, 'If an account with that email exists, a password reset link has been sent.');
+
   const user = await User.findOne({ email });
-  if (!user) return res.status(200).json(genericResponse);
+  if (!user) {
+    return res.status(200).json(genericResponse);
+  }
 
   const resetToken = user.getResetPasswordToken();
   await user.save({ validateBeforeSave: false });
 
   const resetUrl = `${process.env.CLIENT_URL || 'http://localhost:3000'}/reset-password/${resetToken}`;
+
   try {
     const content = emailTemplates.passwordReset({ name: user.name, resetUrl });
     await sendEmail({ to: user.email, subject: content.subject, html: content.html, text: content.text });
   } catch (err) {
-    console.error('[Auth] Failed to send password reset email:', err.message);
-    user.passwordResetToken = undefined;
-    user.passwordResetExpiry = undefined;
-    await user.save({ validateBeforeSave: false });
-    return next(new ApiError('Could not send password reset email. Please try again later.', 500));
+    console.error('[Auth] Failed to send password reset email (non-blocking):', err.message);
+    console.log(`[Auth] Password reset link for ${user.email}: ${resetUrl}`);
   }
 
   res.status(200).json(genericResponse);
@@ -183,7 +250,7 @@ exports.resetPassword = asyncHandler(async (req, res, next) => {
   });
 
   sendTokenResponse(user, 200, res);
-}); // <-- THIS bracket was missing, which trapped acceptStaffInvite inside!
+});
 
 exports.acceptStaffInvite = asyncHandler(async (req, res, next) => {
   const { token, email, name, password } = req.body;

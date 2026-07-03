@@ -3,7 +3,8 @@ const { body } = require('express-validator');
 const {
   register, login, logout, getMe, updatePassword,
   forgotPassword, resetPassword, refreshToken,
-  acceptStaffInvite,
+  acceptStaffInvite, getSecurityQuestion, resetPasswordWithSecurityAnswer,
+  setSecurityQuestion,
 } = require('../controllers/auth.controller');
 const { protect } = require('../middleware/auth.middleware');
 const validate = require('../middleware/validate.middleware');
@@ -30,10 +31,14 @@ router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
 router.put('/me/password', protect, updatePassword);
 router.post('/refresh', refreshToken);
+router.put('/me/security-question', protect, setSecurityQuestion);
 
 router.post('/accept-invite', acceptStaffInvite);
 
 router.post('/forgotpassword', body('email').isEmail().withMessage('Please provide a valid email address'), validate, forgotPassword);
 router.put('/resetpassword/:token', body('password').isLength({ min: 8 }).withMessage('Password must be at least 8 characters'), validate, resetPassword);
+
+router.post('/security-question', body('email').isEmail().withMessage('Valid email required'), validate, getSecurityQuestion);
+router.post('/reset-with-security-answer', resetPasswordWithSecurityAnswer);
 
 module.exports = router;

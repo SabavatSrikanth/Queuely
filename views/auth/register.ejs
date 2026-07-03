@@ -1,70 +1,75 @@
-<%- include('../layouts/main', { title: 'Register - ' + appName, body: ` <div class="row justify-content-center">
-  <div class="col-md-5 col-lg-4">
-    <div class="text-center mb-4">
-      <div
-        style="width:64px; height:64px; background:linear-gradient(135deg,#4f46e5,#7c3aed); border-radius:16px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:1rem;">
-        <i class="bi bi-person-plus-fill text-white" style="font-size:1.75rem;"></i>
+<%- include('../layouts/main', { title: 'Register - ' + appName, body: `
+  <div class="row justify-content-center">
+    <div class="col-md-5 col-lg-4">
+      <div class="text-center mb-4">
+        <div style="width:64px; height:64px; background:linear-gradient(135deg,#4f46e5,#7c3aed); border-radius:16px; display:inline-flex; align-items:center; justify-content:center; margin-bottom:1rem;">
+          <i class="bi bi-person-plus-fill text-white" style="font-size:1.75rem;"></i>
+        </div>
+        <h3 class="fw-bold mb-1">Create your account</h3>
+        <p class="text-muted">Join Queuely in seconds</p>
       </div>
-      <h3 class="fw-bold mb-1">Create your account</h3>
-      <p class="text-muted">Join Queuely in seconds</p>
-    </div>
-    <div class="card shadow-sm border-0" style="border-radius:16px;">
-      <div class="card-body p-4">
-        <div id="errorBox" class="alert alert-danger d-none rounded-3"></div>
-        <form id="registerForm">
-          <div class="mb-3">
-            <label class="form-label fw-500">Full Name</label>
-            <input type="text" class="form-control" id="name" placeholder="John Doe" required minlength="2"
-              style="border-radius:10px; padding:0.75rem 1rem;">
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-500">Email address</label>
-            <input type="email" class="form-control" id="email" placeholder="you@example.com" required
-              style="border-radius:10px; padding:0.75rem 1rem;">
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-500">Phone Number <span class="text-muted fw-normal">(optional)</span></label>
-            <input type="text" class="form-control" id="phone" placeholder="+91 9876543210"
-              style="border-radius:10px; padding:0.75rem 1rem;">
-          </div>
-          <div class="mb-3">
-            <label class="form-label fw-500">Password</label>
-            <input type="password" class="form-control" id="password" placeholder="Min 8 characters" required
-              minlength="8" style="border-radius:10px; padding:0.75rem 1rem;">
-          </div>
-          <div class="mb-4">
-            <label class="form-label fw-500">I want to</label>
-            <div class="row g-2">
-              <div class="col-6">
-                <input type="radio" class="btn-check" name="role" id="role-customer" value="customer" checked>
-                <label class="btn btn-outline-primary w-100" for="role-customer" style="border-radius:10px;">
-                  <i class="bi bi-person d-block mb-1" style="font-size:1.25rem;"></i>
-                  <span style="font-size:0.8rem;">Join Queues</span>
-                </label>
-              </div>
-              <div class="col-6">
-                <input type="radio" class="btn-check" name="role" id="role-owner" value="business_owner">
-                <label class="btn btn-outline-primary w-100" for="role-owner" style="border-radius:10px;">
-                  <i class="bi bi-building d-block mb-1" style="font-size:1.25rem;"></i>
-                  <span style="font-size:0.8rem;">Manage Business</span>
-                </label>
+      <div class="card shadow-sm border-0" style="border-radius:16px;">
+        <div class="card-body p-4">
+          <div id="errorBox" class="alert alert-danger d-none rounded-3"></div>
+          <form id="registerForm">
+            <div class="mb-3">
+              <label class="form-label fw-500">Full Name</label>
+              <input type="text" class="form-control" id="name" placeholder="John Doe" required minlength="2" style="border-radius:10px; padding:0.75rem 1rem;">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-500">Email address</label>
+              <input type="email" class="form-control" id="email" placeholder="you@example.com" required style="border-radius:10px; padding:0.75rem 1rem;">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-500">Phone Number <span class="text-muted fw-normal">(optional)</span></label>
+              <input type="text" class="form-control" id="phone" placeholder="+91 9876543210" style="border-radius:10px; padding:0.75rem 1rem;">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-500">Password</label>
+              <input type="password" class="form-control" id="password" placeholder="Min 8 characters" required minlength="8" style="border-radius:10px; padding:0.75rem 1rem;">
+            </div>
+            <div class="mb-3">
+              <label class="form-label fw-500">Security Question <span class="text-muted fw-normal">(for password recovery)</span></label>
+              <select class="form-select mb-2" id="security-question" style="border-radius:10px; padding:0.75rem 1rem;">
+                <option value="">Select a question</option>
+                <option value="What was the name of your first pet?">What was the name of your first pet?</option>
+                <option value="What city were you born in?">What city were you born in?</option>
+                <option value="What was your childhood nickname?">What was your childhood nickname?</option>
+                <option value="What is your favorite book?">What is your favorite book?</option>
+              </select>
+              <input type="text" class="form-control" id="security-answer" placeholder="Your answer" style="border-radius:10px; padding:0.75rem 1rem;">
+            </div>
+            <div class="mb-4">
+              <label class="form-label fw-500">I want to</label>
+              <div class="row g-2">
+                <div class="col-6">
+                  <input type="radio" class="btn-check" name="role" id="role-customer" value="customer" checked>
+                  <label class="btn btn-outline-primary w-100" for="role-customer" style="border-radius:10px;">
+                    <i class="bi bi-person d-block mb-1" style="font-size:1.25rem;"></i>
+                    <span style="font-size:0.8rem;">Join Queues</span>
+                  </label>
+                </div>
+                <div class="col-6">
+                  <input type="radio" class="btn-check" name="role" id="role-owner" value="business_owner">
+                  <label class="btn btn-outline-primary w-100" for="role-owner" style="border-radius:10px;">
+                    <i class="bi bi-building d-block mb-1" style="font-size:1.25rem;"></i>
+                    <span style="font-size:0.8rem;">Manage Business</span>
+                  </label>
+                </div>
               </div>
             </div>
+            <button type="submit" class="btn btn-primary w-100 py-2" style="border-radius:10px; font-size:1rem;">Create Account</button>
+          </form>
+          <div class="text-center mt-4">
+            <p class="text-muted mb-0">Already have an account? <a href="/login" class="text-decoration-none fw-600">Sign in</a></p>
           </div>
-          <button type="submit" class="btn btn-primary w-100 py-2" style="border-radius:10px; font-size:1rem;">Create
-            Account</button>
-        </form>
-        <div class="text-center mt-4">
-          <p class="text-muted mb-0">Already have an account? <a href="/login" class="text-decoration-none fw-600">Sign
-              in</a></p>
         </div>
       </div>
     </div>
   </div>
-  </div>
-  `, script: `
+`, script: `
   <script>
-    document.getElementById('registerForm').addEventListener('submit', async function (e) {
+    document.getElementById('registerForm').addEventListener('submit', async function(e) {
       e.preventDefault();
       const errorBox = document.getElementById('errorBox');
       errorBox.classList.add('d-none');
@@ -83,15 +88,16 @@
             email: document.getElementById('email').value,
             phone: document.getElementById('phone').value,
             password: document.getElementById('password').value,
-            role: role
+            role: role,
+            securityQuestion: document.getElementById('security-question').value,
+            securityAnswer: document.getElementById('security-answer').value
           })
         });
         const data = await res.json();
         if (data.success) {
           window.location.href = data.data.user.role === 'business_owner' ? '/dashboard' : '/';
-        }
-           else {
-          errorBox.textContent = data.error || data.message || data.errors?.[0]?.msg || 'Registration failed';
+        } else {
+          errorBox.textContent = data.error || data.message || (data.errors && data.errors[0] && data.errors[0].msg) || 'Registration failed';
           errorBox.classList.remove('d-none');
           btn.disabled = false;
           btn.innerHTML = 'Create Account';
@@ -104,4 +110,4 @@
       }
     });
   </script>
-  ` }) %>
+` }) %>

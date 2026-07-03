@@ -37,14 +37,14 @@ const userSchema = new mongoose.Schema(
       minlength: [2, "Name must be at least 2 characters"],
       maxlength: [50, "Name cannot exceed 50 characters"],
     },
-    
-email: {
-  type: String,
-  required: [true, "Email is required"],
-  lowercase: true,
-  trim: true,
-  match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
-},
+
+    email: {
+      type: String,
+      required: [true, "Email is required"],
+      lowercase: true,
+      trim: true,
+      match: [/^\S+@\S+\.\S+$/, "Please provide a valid email address"],
+    },
 
     password: {
       type: String,
@@ -114,7 +114,7 @@ email: {
       select: false,
     },
 
-    // Password reset
+    // Password reset (email-based, kept as fallback)
     passwordResetToken: {
       type: String,
       select: false,
@@ -122,6 +122,18 @@ email: {
     passwordResetExpiry: {
       type: Date,
       select: false,
+    },
+
+    // Security question (email-free password recovery)
+    securityQuestion: {
+      type: String,
+      default: null,
+    },
+
+    securityAnswerHash: {
+      type: String,
+      select: false,
+      default: null,
     },
 
     // Account status
@@ -154,15 +166,27 @@ userSchema.index({ branchId: 1 });
 userSchema.index({ role: 1 });
 
 // ---------------------------------------------------------------------------
-// Pre-save Hook — Hash password only when it has been modified
+// Pre-save Hook — Hash password and security answer only when modified
 // ---------------------------------------------------------------------------
 userSchema.pre("save", async function (next) {
-  // Skip hashing if the password field hasn't changed
-  if (!this.isModified("password")) return next();
-
   try {
-    const salt = await bcrypt.genSalt(SALT_ROUNDS);
-    this.password = await bcrypt.hash(this.password, salt);
+    if (this.isModified("password")) {
+      const salt = await bcrypt.genSalt(SALT_ROUNDS);
+      this.password = await bcrypt.hash(this.password, salt);
+    }
+
+    if (
+      this.isModified("securityAnswerHash") &&
+      this.securityAnswerHash &&
+      !this.securityAnswerHash.startsWith("$2")
+    ) {
+      const salt = await bcrypt.genSalt(SALT_ROUNDS);
+      this.securityAnswerHash = await bcrypt.hash(
+        this.securityAnswerHash.toLowerCase().trim(),
+        salt
+      );
+    }
+
     next();
   } catch (err) {
     next(err);
@@ -188,6 +212,20 @@ userSchema.methods.comparePassword = async function (candidatePassword) {
 
 userSchema.methods.matchPassword = async function (candidatePassword) {
   return bcrypt.compare(candidatePassword, this.password);
+};
+
+/**
+ * matchSecurityAnswer
+ * Compares a plain-text candidate answer against the stored bcrypt hash.
+ * NOTE: You must explicitly select the field in your query,
+ *       e.g. User.findOne({ email }).select('+securityAnswerHash')
+ *
+ * @param {string} candidateAnswer - The plain-text answer to verify
+ * @returns {Promise<boolean>} true if answers match, false otherwise
+ */
+userSchema.methods.matchSecurityAnswer = async function (candidateAnswer) {
+  if (!this.securityAnswerHash) return false;
+  return bcrypt.compare(candidateAnswer.toLowerCase().trim(), this.securityAnswerHash);
 };
 
 userSchema.methods.getSignedJwtToken = function () {
